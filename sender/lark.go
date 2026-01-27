@@ -175,12 +175,10 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry) map[string]any {
 	// Determine header color based on highest severity
 	headerColor := "blue"
 	for _, entry := range entries {
-		if entry.Level == models.LevelEmergency || entry.Level == models.LevelAlert || entry.Level == models.LevelCritical {
+		if entry.Level == models.LevelEmergency || entry.Level == models.LevelAlert || entry.Level == models.LevelCritical || entry.Level == models.LevelError {
 			headerColor = "red"
 			break
-		} else if entry.Level == models.LevelError {
-			headerColor = "orange"
-		} else if entry.Level == models.LevelWarning && headerColor != "orange" {
+		} else if entry.Level == models.LevelWarning && headerColor != "red" {
 			headerColor = "yellow"
 		}
 	}

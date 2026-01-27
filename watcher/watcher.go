@@ -18,23 +18,25 @@ import (
 
 // Watcher monitors Laravel log files and sends entries to the buffer
 type Watcher struct {
-	cfg         config.WatcherConfig
-	logDir      string
-	buffer      *buffer.Buffer
-	parser      *parser.Parser
-	currentFile string
-	offset      int64
-	minLevel    models.LogLevel
+	cfg           config.WatcherConfig
+	logDir        string
+	buffer        *buffer.Buffer
+	parser        *parser.Parser
+	currentFile   string
+	offset        int64
+	minLevel      models.LogLevel
+	messageMaxLen int
 }
 
 // NewWatcher creates a new log file watcher
-func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string) *Watcher {
+func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, messageMaxLen int) *Watcher {
 	return &Watcher{
-		cfg:      cfg,
-		logDir:   logDir,
-		buffer:   buf,
-		parser:   parser.NewParser(),
-		minLevel: models.ParseLogLevel(minLogLevel),
+		cfg:           cfg,
+		logDir:        logDir,
+		buffer:        buf,
+		parser:        parser.NewParser(messageMaxLen),
+		minLevel:      models.ParseLogLevel(minLogLevel),
+		messageMaxLen: messageMaxLen,
 	}
 }
 
@@ -78,7 +80,7 @@ func (w *Watcher) checkLogs() error {
 		}
 		w.currentFile = logFile
 		w.offset = 0
-		w.parser = parser.NewParser()
+		w.parser = parser.NewParser(w.messageMaxLen)
 	}
 
 	// Check if file exists

@@ -52,7 +52,7 @@ func main() {
 	go larkSender.Start(ctx)
 
 	// Create and start watcher
-	logWatcher := watcher.NewWatcher(cfg.Watcher, cfg.LogDirectory, buf, cfg.MinLogLevel)
+	logWatcher := watcher.NewWatcher(cfg.Watcher, cfg.LogDirectory, buf, cfg.MinLogLevel, cfg.MessageMaxLength)
 
 	// Start watcher in goroutine
 	errChan := make(chan error, 1)

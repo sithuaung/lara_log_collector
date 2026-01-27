@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
@@ -20,12 +19,12 @@ var (
 // Parser parses Laravel log entries
 type Parser struct {
 	currentEntry  *models.LogEntry
-	stackTraceLines []string
+	messageMaxLen int
 }
 
 // NewParser creates a new log parser
-func NewParser() *Parser {
-	return &Parser{}
+func NewParser(messageMaxLen int) *Parser {
+	return &Parser{messageMaxLen: messageMaxLen}
 }
 
 // ParseLine parses a single log line and returns a log entry if complete
@@ -49,11 +48,6 @@ func (p *Parser) ParseLine(line string) *models.LogEntry {
 		p.currentEntry = p.parseNewEntry(matches, line)
 
 		return completed
-	}
-
-	// This is a continuation line (likely stack trace)
-	if p.currentEntry != nil {
-		p.stackTraceLines = append(p.stackTraceLines, line)
 	}
 
 	return nil
@@ -81,6 +75,7 @@ func (p *Parser) parseNewEntry(matches []string, rawLine string) *models.LogEntr
 	// Parse message and optional JSON context
 	message := matches[4]
 	entry.Message, entry.Context = parseMessageAndContext(message)
+	entry.Message = truncateMessage(entry.Message, p.messageMaxLen)
 
 	return entry
 }
@@ -89,34 +84,15 @@ func (p *Parser) parseNewEntry(matches []string, rawLine string) *models.LogEntr
 func (p *Parser) finalizeEntry() *models.LogEntry {
 	entry := p.currentEntry
 
-	if len(p.stackTraceLines) > 0 {
-		entry.StackTrace = strings.Join(p.stackTraceLines, "\n")
-	}
-
 	p.currentEntry = nil
-	p.stackTraceLines = nil
+	// Stack traces are intentionally ignored to reduce memory usage.
 
 	return entry
 }
 
 // parseMessageAndContext extracts the message and optional JSON context
 func parseMessageAndContext(message string) (string, map[string]any) {
-	// Find JSON object at the end of the message
-	lastBrace := strings.LastIndex(message, "{")
-	if lastBrace == -1 {
-		return message, nil
-	}
-
-	jsonPart := message[lastBrace:]
-	var context map[string]any
-
-	if err := json.Unmarshal([]byte(jsonPart), &context); err == nil {
-		// Successfully parsed JSON, separate message and context
-		msg := strings.TrimSpace(message[:lastBrace])
-		return msg, context
-	}
-
-	// JSON parsing failed, treat entire thing as message
+	// Context parsing is intentionally disabled to reduce memory usage.
 	return message, nil
 }
 
@@ -142,4 +118,15 @@ func ParseLevel(level string) models.LogLevel {
 	default:
 		return models.LevelInfo
 	}
+}
+
+func truncateMessage(message string, maxLen int) string {
+	message = strings.TrimSpace(message)
+	if maxLen <= 0 || len(message) <= maxLen {
+		return message
+	}
+	if maxLen <= 3 {
+		return message[:maxLen]
+	}
+	return message[:maxLen-3] + "..."
 }
