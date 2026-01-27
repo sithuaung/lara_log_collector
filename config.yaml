@@ -1,0 +1,27 @@
+# Laravel Log Collector Configuration
+
+# Directory containing Laravel log files
+log_directory: "/home/forge/blog/storage/logs"
+
+# Minimum log level to collect (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY)
+min_log_level: "ERROR"
+
+# Maximum message length (characters) - longer messages are trimmed
+message_max_length: 50
+
+# Lark webhook settings
+lark:
+  webhook_url: "https://open.larksuite.com/open-apis/bot/v2/hook/000b96de-8e8c-4e68-bca3-2f0068adf647"
+  batch_size: 10          # Number of log entries to batch before sending
+  flush_interval: 5s      # Max time to wait before sending (even if batch not full)
+  max_retries: 3          # Number of retry attempts on failure
+  retry_delay: 1s         # Initial delay between retries (doubles each retry)
+
+# Buffer settings for backpressure handling
+buffer:
+  size: 10000             # Maximum entries to buffer
+  drop_oldest: false       # When full: true = drop oldest, false = block
+
+# File watcher settings
+watcher:
+  poll_interval: 3s       # How often to check for new log lines
