@@ -18,25 +18,25 @@ import (
 
 // Watcher monitors Laravel log files and sends entries to the buffer
 type Watcher struct {
-	cfg           config.WatcherConfig
-	logDir        string
-	appName       string
-	buffer        *buffer.Buffer
-	parser        *parser.Parser
-	currentFile   string
-	offset        int64
-	minLevel      models.LogLevel
+	cfg         config.WatcherConfig
+	logDir      string
+	appName     string
+	buffer      *buffer.Buffer
+	parser      *parser.Parser
+	currentFile string
+	offset      int64
+	minLevel    models.LogLevel
 }
 
 // NewWatcher creates a new log file watcher
 func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string) *Watcher {
 	return &Watcher{
-		cfg:           cfg,
-		logDir:        logDir,
-		appName:       "",
-		buffer:        buf,
-		parser:        parser.NewParser(),
-		minLevel:      models.ParseLogLevel(minLogLevel),
+		cfg:      cfg,
+		logDir:   logDir,
+		appName:  "",
+		buffer:   buf,
+		parser:   parser.NewParser(),
+		minLevel: models.ParseLogLevel(minLogLevel),
 	}
 }
 
@@ -115,7 +115,10 @@ func (w *Watcher) checkLogs() error {
 
 // getCurrentLogFile returns the path to today's log file
 func (w *Watcher) getCurrentLogFile() string {
-	filename := "laravel-" + time.Now().Format("2006-01-02") + ".log"
+	filename := "laravel-" + time.Now().UTC().Format("2006-01-02") + ".log"
+
+	fmt.Println("File name scanned " + filename)
+
 	return filepath.Join(w.logDir, filename)
 }
 

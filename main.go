@@ -58,9 +58,9 @@ func main() {
 	// Create buffer
 	buf := buffer.NewBuffer(cfg.Buffer.Size, cfg.Buffer.DropOldest)
 
-	// Create and start sender
-	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.AppName)
-	go larkSender.Start(ctx)
+	// Create and start sender (interface makes it easy to swap implementations)
+	logSender := sender.NewLarkSender(cfg.Lark, buf, cfg.AppName)
+	go logSender.Start(ctx)
 
 	// Create and start watchers
 	errChan := make(chan error, len(logDirs))

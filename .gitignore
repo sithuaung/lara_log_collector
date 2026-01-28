@@ -13,3 +13,4 @@ Taskfile.yml
 load-test-local.js
 webhooks.md
 config.yaml
+.claude
