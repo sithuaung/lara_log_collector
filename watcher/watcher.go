@@ -26,25 +26,23 @@ type Watcher struct {
 	currentFile   string
 	offset        int64
 	minLevel      models.LogLevel
-	messageMaxLen int
 }
 
 // NewWatcher creates a new log file watcher
-func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, messageMaxLen int) *Watcher {
+func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string) *Watcher {
 	return &Watcher{
 		cfg:           cfg,
 		logDir:        logDir,
 		appName:       "",
 		buffer:        buf,
-		parser:        parser.NewParser(messageMaxLen),
+		parser:        parser.NewParser(),
 		minLevel:      models.ParseLogLevel(minLogLevel),
-		messageMaxLen: messageMaxLen,
 	}
 }
 
 // NewWatcherWithApp creates a new log file watcher with an app name for tagging entries
-func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string, messageMaxLen int) *Watcher {
-	w := NewWatcher(cfg, logDir, buf, minLogLevel, messageMaxLen)
+func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string) *Watcher {
+	w := NewWatcher(cfg, logDir, buf, minLogLevel)
 	w.appName = appName
 	return w
 }
@@ -89,7 +87,7 @@ func (w *Watcher) checkLogs() error {
 		}
 		w.currentFile = logFile
 		w.offset = 0
-		w.parser = parser.NewParser(w.messageMaxLen)
+		w.parser = parser.NewParser()
 	}
 
 	// Check if file exists

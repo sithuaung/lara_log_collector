@@ -44,7 +44,6 @@ func main() {
 		log.Printf("  Log directories: %s", strings.Join(logDirs, ", "))
 	}
 	log.Printf("  Min log level: %s", cfg.MinLogLevel)
-	log.Printf("  Message max length: %d", cfg.MessageMaxLength)
 	log.Printf("  Buffer size: %d", cfg.Buffer.Size)
 	log.Printf("  Batch size: %d", cfg.Lark.BatchSize)
 
@@ -60,7 +59,7 @@ func main() {
 	buf := buffer.NewBuffer(cfg.Buffer.Size, cfg.Buffer.DropOldest)
 
 	// Create and start sender
-	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.MessageMaxLength, cfg.AppName)
+	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.AppName)
 	go larkSender.Start(ctx)
 
 	// Create and start watchers
@@ -74,7 +73,7 @@ func main() {
 			appName = deriveAppNameFromLogDir(logDir)
 		}
 		log.Printf("  Watching: %s (app=%s)", logDir, appName)
-		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel, cfg.MessageMaxLength)
+		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel)
 		go func(w *watcher.Watcher) {
 			errChan <- w.Start(ctx)
 		}(logWatcher)

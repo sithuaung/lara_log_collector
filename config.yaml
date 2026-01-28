@@ -16,9 +16,6 @@ app_name: "Default App Name"
 # Minimum log level to collect (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY)
 min_log_level: "ERROR"
 
-# Maximum message length (characters) - longer messages are trimmed
-message_max_length: 200
-
 # Lark webhook settings
 lark:
   webhook_url: "https://open.larksuite.com/open-apis/bot/v2/hook/000b96de-8e8c-4e68-bca3-2f0068adf647"

@@ -14,7 +14,6 @@ type Config struct {
 	LogDirectories   []string      `yaml:"log_directories"`
 	AppName          string        `yaml:"app_name"`
 	MinLogLevel      string        `yaml:"min_log_level"`
-	MessageMaxLength int           `yaml:"message_max_length"`
 	Lark             LarkConfig    `yaml:"lark"`
 	Buffer           BufferConfig  `yaml:"buffer"`
 	Watcher          WatcherConfig `yaml:"watcher"`
@@ -47,7 +46,6 @@ func DefaultConfig() *Config {
 		LogDirectories:   nil,
 		AppName:          "Laravel Logs",
 		MinLogLevel:      "ERROR",
-		MessageMaxLength: 200,
 		Lark: LarkConfig{
 			WebhookURL:    "",
 			BatchSize:     10,

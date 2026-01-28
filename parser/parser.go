@@ -18,13 +18,12 @@ var (
 
 // Parser parses Laravel log entries
 type Parser struct {
-	currentEntry  *models.LogEntry
-	messageMaxLen int
+	currentEntry *models.LogEntry
 }
 
 // NewParser creates a new log parser
-func NewParser(messageMaxLen int) *Parser {
-	return &Parser{messageMaxLen: messageMaxLen}
+func NewParser() *Parser {
+	return &Parser{}
 }
 
 // ParseLine parses a single log line and returns a log entry if complete
@@ -75,7 +74,7 @@ func (p *Parser) parseNewEntry(matches []string, rawLine string) *models.LogEntr
 	// Parse message and optional JSON context
 	message := matches[4]
 	entry.Message, entry.Context = parseMessageAndContext(message)
-	entry.Message = truncateMessage(entry.Message, p.messageMaxLen)
+	entry.Message = stripStacktrace(entry.Message)
 
 	return entry
 }
@@ -120,13 +119,16 @@ func ParseLevel(level string) models.LogLevel {
 	}
 }
 
-func truncateMessage(message string, maxLen int) string {
+func stripStacktrace(message string) string {
 	message = strings.TrimSpace(message)
-	if maxLen <= 0 || len(message) <= maxLen {
+	if message == "" {
 		return message
 	}
-	if maxLen <= 3 {
-		return message[:maxLen]
+
+	lower := strings.ToLower(message)
+	idx := strings.Index(lower, "[stacktrace]")
+	if idx == -1 {
+		return message
 	}
-	return message[:maxLen-3] + "..."
+	return strings.TrimSpace(message[:idx])
 }

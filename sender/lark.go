@@ -26,12 +26,11 @@ type LarkSender struct {
 	batch            []*models.LogEntry
 	batchMu          sync.Mutex
 	flushTimer       *time.Timer
-	messageMaxLength int
 	defaultAppName   string
 }
 
 // NewLarkSender creates a new Lark webhook sender
-func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength int, appName string) *LarkSender {
+func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, appName string) *LarkSender {
 	return &LarkSender{
 		cfg: cfg,
 		client: &http.Client{
@@ -39,7 +38,6 @@ func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength i
 		},
 		buffer:           buf,
 		batch:            make([]*models.LogEntry, 0, cfg.BatchSize),
-		messageMaxLength: messageMaxLength,
 		defaultAppName:   appName,
 	}
 }
@@ -261,12 +259,11 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 		return nil
 	}
 
-	const messageLimit = 200
 	byKey := make(map[string]*groupedEntry, len(entries))
 	order := make([]string, 0, len(entries))
 
 	for _, entry := range entries {
-		message := truncateString(entry.Message, messageLimit)
+		message := entry.Message
 		key := fmt.Sprintf("%s|%s", entry.Level, message)
 
 		if existing, ok := byKey[key]; ok {
