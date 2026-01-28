@@ -30,6 +30,7 @@ func main() {
 	}
 
 	log.Printf("Starting Laravel Log Collector")
+	log.Printf("  App name: %s", cfg.AppName)
 	log.Printf("  Log directory: %s", cfg.LogDirectory)
 	log.Printf("  Min log level: %s", cfg.MinLogLevel)
 	log.Printf("  Message max length: %d", cfg.MessageMaxLength)
@@ -48,7 +49,7 @@ func main() {
 	buf := buffer.NewBuffer(cfg.Buffer.Size, cfg.Buffer.DropOldest)
 
 	// Create and start sender
-	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.MessageMaxLength)
+	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.MessageMaxLength, cfg.AppName)
 	go larkSender.Start(ctx)
 
 	// Create and start watcher

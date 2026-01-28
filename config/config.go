@@ -10,6 +10,7 @@ import (
 // Config holds all configuration for the log collector
 type Config struct {
 	LogDirectory     string        `yaml:"log_directory"`
+	AppName          string        `yaml:"app_name"`
 	MinLogLevel      string        `yaml:"min_log_level"`
 	MessageMaxLength int           `yaml:"message_max_length"`
 	Lark             LarkConfig    `yaml:"lark"`
@@ -41,6 +42,7 @@ type WatcherConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		LogDirectory:     "./storage/logs",
+		AppName:          "Laravel Logs",
 		MinLogLevel:      "ERROR",
 		MessageMaxLength: 50,
 		Lark: LarkConfig{
@@ -86,6 +88,9 @@ func LoadConfig(path string) (*Config, error) {
 func (c *Config) applyEnvOverrides() {
 	if v := os.Getenv("LOG_DIRECTORY"); v != "" {
 		c.LogDirectory = v
+	}
+	if v := os.Getenv("APP_NAME"); v != "" {
+		c.AppName = v
 	}
 	if v := os.Getenv("LARK_WEBHOOK_URL"); v != "" {
 		c.Lark.WebhookURL = v

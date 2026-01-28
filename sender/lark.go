@@ -27,10 +27,11 @@ type LarkSender struct {
 	batchMu          sync.Mutex
 	flushTimer       *time.Timer
 	messageMaxLength int
+	appName          string
 }
 
 // NewLarkSender creates a new Lark webhook sender
-func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength int) *LarkSender {
+func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength int, appName string) *LarkSender {
 	return &LarkSender{
 		cfg: cfg,
 		client: &http.Client{
@@ -39,6 +40,7 @@ func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength i
 		buffer:           buf,
 		batch:            make([]*models.LogEntry, 0, cfg.BatchSize),
 		messageMaxLength: messageMaxLength,
+		appName:          appName,
 	}
 }
 
@@ -218,7 +220,7 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry) map[string]any {
 			"template": headerColor,
 			"title": map[string]any{
 				"tag":     "plain_text",
-				"content": fmt.Sprintf("Laravel Logs (%d entries, %d groups)", len(entries), len(grouped)),
+				"content": fmt.Sprintf("%s (%d entries, %d groups)", s.appName, len(entries), len(grouped)),
 			},
 		},
 		"elements": elements,
