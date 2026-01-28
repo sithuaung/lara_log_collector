@@ -1,0 +1,22 @@
+[Unit]
+Description=Laravel Log Collector
+After=network.target
+
+[Service]
+Type=simple
+User=forge
+WorkingDirectory=/home/forge/lara_log_collector
+ExecStart=/home/forge/lara_log_collector/lara_log_collector -config /home/forge/lara_log_collector/config.yaml
+Restart=always
+RestartSec=5
+
+# Resource limits (optional)
+CPUQuota=5%
+MemoryMax=50M
+
+# Environment variables (alternative to config.yaml)
+# Environment=LARK_WEBHOOK_URL=https://...
+# Environment=LOG_DIRECTORY=/var/www/html/storage/logs
+
+[Install]
+WantedBy=multi-user.target
