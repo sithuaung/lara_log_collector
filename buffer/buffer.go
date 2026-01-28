@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"lara_log_collector/models"
+	"github.com/sithuaung/lara_log_collector/models"
 )
 
 // Buffer is a bounded buffer for log entries with backpressure handling

@@ -1,4 +1,4 @@
-module lara_log_collector
+module github.com/sithuaung/lara_log_collector
 
 go 1.25.4
 

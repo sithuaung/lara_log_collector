@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"lara_log_collector/buffer"
-	"lara_log_collector/config"
-	"lara_log_collector/models"
-	"lara_log_collector/parser"
+	"github.com/sithuaung/lara_log_collector/buffer"
+	"github.com/sithuaung/lara_log_collector/config"
+	"github.com/sithuaung/lara_log_collector/models"
+	"github.com/sithuaung/lara_log_collector/parser"
 )
 
 // Watcher monitors Laravel log files and sends entries to the buffer

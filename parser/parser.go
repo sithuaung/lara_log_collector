@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"lara_log_collector/models"
+	"github.com/sithuaung/lara_log_collector/models"
 )
 
 var (

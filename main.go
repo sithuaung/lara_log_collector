@@ -10,10 +10,10 @@ import (
 	"strings"
 	"syscall"
 
-	"lara_log_collector/buffer"
-	"lara_log_collector/config"
-	"lara_log_collector/sender"
-	"lara_log_collector/watcher"
+	"github.com/sithuaung/lara_log_collector/buffer"
+	"github.com/sithuaung/lara_log_collector/config"
+	"github.com/sithuaung/lara_log_collector/sender"
+	"github.com/sithuaung/lara_log_collector/watcher"
 )
 
 func main() {

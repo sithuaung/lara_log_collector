@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"lara_log_collector/buffer"
-	"lara_log_collector/config"
-	"lara_log_collector/models"
+	"github.com/sithuaung/lara_log_collector/buffer"
+	"github.com/sithuaung/lara_log_collector/config"
+	"github.com/sithuaung/lara_log_collector/models"
 )
 
 // LarkSender sends log entries to Lark webhook
