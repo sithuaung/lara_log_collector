@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -10,6 +11,7 @@ import (
 // Config holds all configuration for the log collector
 type Config struct {
 	LogDirectory     string        `yaml:"log_directory"`
+	LogDirectories   []string      `yaml:"log_directories"`
 	AppName          string        `yaml:"app_name"`
 	MinLogLevel      string        `yaml:"min_log_level"`
 	MessageMaxLength int           `yaml:"message_max_length"`
@@ -42,6 +44,7 @@ type WatcherConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		LogDirectory:     "./storage/logs",
+		LogDirectories:   nil,
 		AppName:          "Laravel Logs",
 		MinLogLevel:      "ERROR",
 		MessageMaxLength: 50,
@@ -89,6 +92,9 @@ func (c *Config) applyEnvOverrides() {
 	if v := os.Getenv("LOG_DIRECTORY"); v != "" {
 		c.LogDirectory = v
 	}
+	if v := os.Getenv("LOG_DIRECTORIES"); v != "" {
+		c.LogDirectories = splitCommaList(v)
+	}
 	if v := os.Getenv("APP_NAME"); v != "" {
 		c.AppName = v
 	}
@@ -98,4 +104,15 @@ func (c *Config) applyEnvOverrides() {
 	if v := os.Getenv("MIN_LOG_LEVEL"); v != "" {
 		c.MinLogLevel = v
 	}
+}
+
+func splitCommaList(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

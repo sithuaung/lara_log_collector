@@ -1,7 +1,14 @@
 # Laravel Log Collector Configuration
 
-# Directory containing Laravel log files
+# Directory containing Laravel log files (single app)
 log_directory: "/home/forge/blog/storage/logs"
+
+# Directories containing Laravel log files (multiple apps)
+# If set, each directory is treated as a separate app, and the app name is derived
+# from the parent of "storage/logs" (e.g. /home/forge/APP/storage/logs -> APP).
+# log_directories:
+#   - "/home/forge/app_one/storage/logs"
+#   - "/home/forge/app_two/storage/logs"
 
 # App Name
 app_name: "Default App Name"

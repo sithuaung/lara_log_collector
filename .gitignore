@@ -10,3 +10,4 @@ lara_log_collector
 default.nginx
 loadtest.js
 Taskfile.yml
+load-test-local.js

@@ -27,7 +27,7 @@ type LarkSender struct {
 	batchMu          sync.Mutex
 	flushTimer       *time.Timer
 	messageMaxLength int
-	appName          string
+	defaultAppName   string
 }
 
 // NewLarkSender creates a new Lark webhook sender
@@ -40,7 +40,7 @@ func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, messageMaxLength i
 		buffer:           buf,
 		batch:            make([]*models.LogEntry, 0, cfg.BatchSize),
 		messageMaxLength: messageMaxLength,
-		appName:          appName,
+		defaultAppName:   appName,
 	}
 }
 
@@ -101,6 +101,19 @@ func (s *LarkSender) flushLocked() {
 
 // sendWithRetry sends entries with exponential backoff retry
 func (s *LarkSender) sendWithRetry(entries []*models.LogEntry) {
+	byApp := groupEntriesByApp(entries, s.defaultAppName)
+	for appName, batch := range byApp {
+		if len(batch) == 0 {
+			continue
+		}
+		if err := s.sendWithRetryForApp(batch, appName); err != nil {
+			log.Printf("Failed to send %d log entries for app %q after %d retries: %v",
+				len(batch), appName, s.cfg.MaxRetries, err)
+		}
+	}
+}
+
+func (s *LarkSender) sendWithRetryForApp(entries []*models.LogEntry, appName string) error {
 	var lastErr error
 	delay := s.cfg.RetryDelay
 
@@ -110,21 +123,20 @@ func (s *LarkSender) sendWithRetry(entries []*models.LogEntry) {
 			delay *= 2 // Exponential backoff
 		}
 
-		if err := s.send(entries); err != nil {
+		if err := s.send(entries, appName); err != nil {
 			lastErr = err
-			log.Printf("Lark send attempt %d failed: %v", attempt+1, err)
+			log.Printf("Lark send attempt %d failed (app=%q): %v", attempt+1, appName, err)
 			continue
 		}
-		return
+		return nil
 	}
 
-	log.Printf("Failed to send %d log entries after %d retries: %v",
-		len(entries), s.cfg.MaxRetries, lastErr)
+	return lastErr
 }
 
 // send sends a batch of entries to Lark
-func (s *LarkSender) send(entries []*models.LogEntry) error {
-	card := s.buildCard(entries)
+func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
+	card := s.buildCard(entries, appName)
 	payload := s.buildPayload(card)
 
 	body, err := json.Marshal(payload)
@@ -173,7 +185,7 @@ func (s *LarkSender) buildPayload(card map[string]any) map[string]any {
 }
 
 // buildCard creates a Lark card message from log entries
-func (s *LarkSender) buildCard(entries []*models.LogEntry) map[string]any {
+func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[string]any {
 	// Determine header color based on highest severity
 	headerColor := "blue"
 	for _, entry := range entries {
@@ -220,7 +232,7 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry) map[string]any {
 			"template": headerColor,
 			"title": map[string]any{
 				"tag":     "plain_text",
-				"content": fmt.Sprintf("%s (%d entries, %d groups)", s.appName, len(entries), len(grouped)),
+				"content": fmt.Sprintf("%s (%d entries, %d groups)", appName, len(entries), len(grouped)),
 			},
 		},
 		"elements": elements,
@@ -282,6 +294,18 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 	}
 
 	return grouped
+}
+
+func groupEntriesByApp(entries []*models.LogEntry, defaultAppName string) map[string][]*models.LogEntry {
+	byApp := make(map[string][]*models.LogEntry)
+	for _, entry := range entries {
+		appName := entry.AppName
+		if appName == "" {
+			appName = defaultAppName
+		}
+		byApp[appName] = append(byApp[appName], entry)
+	}
+	return byApp
 }
 
 func redactWebhookURL(raw string) string {

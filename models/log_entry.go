@@ -18,13 +18,14 @@ const (
 
 // LogEntry represents a parsed Laravel log entry
 type LogEntry struct {
-	Timestamp   time.Time              `json:"timestamp"`
-	Environment string                 `json:"environment"`
-	Level       LogLevel               `json:"level"`
-	Message     string                 `json:"message"`
+	Timestamp   time.Time      `json:"timestamp"`
+	Environment string         `json:"environment"`
+	Level       LogLevel       `json:"level"`
+	Message     string         `json:"message"`
 	Context     map[string]any `json:"context,omitempty"`
-	StackTrace  string                 `json:"stack_trace,omitempty"`
-	RawLine     string                 `json:"raw_line"`
+	StackTrace  string         `json:"stack_trace,omitempty"`
+	RawLine     string         `json:"raw_line"`
+	AppName     string         `json:"app_name"`
 }
 
 // IsError returns true if the log level is ERROR or higher severity

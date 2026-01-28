@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"lara_log_collector/buffer"
@@ -29,9 +31,18 @@ func main() {
 		log.Fatal("Lark webhook URL is required (set in config or LARK_WEBHOOK_URL env)")
 	}
 
+	logDirs := cfg.LogDirectories
+	if len(logDirs) == 0 {
+		logDirs = []string{cfg.LogDirectory}
+	}
+
 	log.Printf("Starting Laravel Log Collector")
-	log.Printf("  App name: %s", cfg.AppName)
-	log.Printf("  Log directory: %s", cfg.LogDirectory)
+	log.Printf("  App name (default): %s", cfg.AppName)
+	if len(logDirs) == 1 {
+		log.Printf("  Log directory: %s", logDirs[0])
+	} else {
+		log.Printf("  Log directories: %s", strings.Join(logDirs, ", "))
+	}
 	log.Printf("  Min log level: %s", cfg.MinLogLevel)
 	log.Printf("  Message max length: %d", cfg.MessageMaxLength)
 	log.Printf("  Buffer size: %d", cfg.Buffer.Size)
@@ -52,14 +63,22 @@ func main() {
 	larkSender := sender.NewLarkSender(cfg.Lark, buf, cfg.MessageMaxLength, cfg.AppName)
 	go larkSender.Start(ctx)
 
-	// Create and start watcher
-	logWatcher := watcher.NewWatcher(cfg.Watcher, cfg.LogDirectory, buf, cfg.MinLogLevel, cfg.MessageMaxLength)
-
-	// Start watcher in goroutine
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- logWatcher.Start(ctx)
-	}()
+	// Create and start watchers
+	errChan := make(chan error, len(logDirs))
+	for _, logDir := range logDirs {
+		appName := cfg.AppName
+		if len(cfg.LogDirectories) > 0 {
+			appName = deriveAppNameFromLogDir(logDir)
+		}
+		if appName == "" {
+			appName = deriveAppNameFromLogDir(logDir)
+		}
+		log.Printf("  Watching: %s (app=%s)", logDir, appName)
+		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel, cfg.MessageMaxLength)
+		go func(w *watcher.Watcher) {
+			errChan <- w.Start(ctx)
+		}(logWatcher)
+	}
 
 	// Wait for shutdown signal or error
 	select {
@@ -78,4 +97,20 @@ func main() {
 	log.Printf("Final stats: received=%d, dropped=%d, pending=%d", received, dropped, pending)
 
 	log.Println("Shutdown complete")
+}
+
+func deriveAppNameFromLogDir(logDir string) string {
+	cleaned := filepath.Clean(logDir)
+	suffix := filepath.Join("storage", "logs")
+	if strings.HasSuffix(cleaned, suffix) {
+		parent := filepath.Dir(filepath.Dir(cleaned))
+		name := filepath.Base(parent)
+		if name == "current" {
+			name = filepath.Base(filepath.Dir(parent))
+		}
+		if name != "." && name != string(filepath.Separator) {
+			return name
+		}
+	}
+	return filepath.Base(cleaned)
 }

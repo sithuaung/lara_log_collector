@@ -20,6 +20,7 @@ import (
 type Watcher struct {
 	cfg           config.WatcherConfig
 	logDir        string
+	appName       string
 	buffer        *buffer.Buffer
 	parser        *parser.Parser
 	currentFile   string
@@ -33,11 +34,19 @@ func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, min
 	return &Watcher{
 		cfg:           cfg,
 		logDir:        logDir,
+		appName:       "",
 		buffer:        buf,
 		parser:        parser.NewParser(messageMaxLen),
 		minLevel:      models.ParseLogLevel(minLogLevel),
 		messageMaxLen: messageMaxLen,
 	}
+}
+
+// NewWatcherWithApp creates a new log file watcher with an app name for tagging entries
+func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string, messageMaxLen int) *Watcher {
+	w := NewWatcher(cfg, logDir, buf, minLogLevel, messageMaxLen)
+	w.appName = appName
+	return w
 }
 
 // Start begins watching for log files
@@ -136,6 +145,7 @@ func (w *Watcher) readNewLines(logFile string) error {
 		if entry := w.parser.ParseLine(line); entry != nil {
 			// Filter by minimum log level
 			if entry.Level.Severity() >= w.minLevel.Severity() {
+				entry.AppName = w.appName
 				w.buffer.Push(entry)
 			}
 		}
