@@ -261,7 +261,7 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 		return nil
 	}
 
-	const messageLimit = 100
+	const messageLimit = 200
 	byKey := make(map[string]*groupedEntry, len(entries))
 	order := make([]string, 0, len(entries))
 
