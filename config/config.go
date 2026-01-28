@@ -47,7 +47,7 @@ func DefaultConfig() *Config {
 		LogDirectories:   nil,
 		AppName:          "Laravel Logs",
 		MinLogLevel:      "ERROR",
-		MessageMaxLength: 50,
+		MessageMaxLength: 200,
 		Lark: LarkConfig{
 			WebhookURL:    "",
 			BatchSize:     10,

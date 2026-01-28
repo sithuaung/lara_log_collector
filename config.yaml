@@ -17,7 +17,7 @@ app_name: "Default App Name"
 min_log_level: "ERROR"
 
 # Maximum message length (characters) - longer messages are trimmed
-message_max_length: 100
+message_max_length: 200
 
 # Lark webhook settings
 lark:
