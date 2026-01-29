@@ -18,7 +18,8 @@ var (
 
 // Parser parses Laravel log entries
 type Parser struct {
-	currentEntry *models.LogEntry
+	currentEntry       *models.LogEntry
+	ignoringStacktrace bool
 }
 
 // NewParser creates a new log parser
@@ -45,8 +46,13 @@ func (p *Parser) ParseLine(line string) *models.LogEntry {
 
 		// Start a new entry
 		p.currentEntry = p.parseNewEntry(matches, line)
+		p.ignoringStacktrace = false
 
 		return completed
+	}
+
+	if p.currentEntry != nil {
+		p.appendContinuationLine(line)
 	}
 
 	return nil
@@ -84,6 +90,7 @@ func (p *Parser) finalizeEntry() *models.LogEntry {
 	entry := p.currentEntry
 
 	p.currentEntry = nil
+	p.ignoringStacktrace = false
 	// Stack traces are intentionally ignored to reduce memory usage.
 
 	return entry
@@ -131,4 +138,39 @@ func stripStacktrace(message string) string {
 		return message
 	}
 	return strings.TrimSpace(message[:idx])
+}
+
+func (p *Parser) appendContinuationLine(line string) {
+	if p.ignoringStacktrace {
+		return
+	}
+
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+
+	lower := strings.ToLower(line)
+	if idx := strings.Index(lower, "[stacktrace]"); idx != -1 {
+		prefix := strings.TrimSpace(line[:idx])
+		if prefix != "" {
+			p.currentEntry.Message = appendMessageLine(p.currentEntry.Message, prefix)
+		}
+		p.ignoringStacktrace = true
+		return
+	}
+
+	if strings.HasPrefix(line, stackTracePrefix) || strings.HasPrefix(lower, "stack trace") {
+		p.ignoringStacktrace = true
+		return
+	}
+
+	p.currentEntry.Message = appendMessageLine(p.currentEntry.Message, line)
+}
+
+func appendMessageLine(message, line string) string {
+	if message == "" {
+		return line
+	}
+	return message + "\n" + line
 }
