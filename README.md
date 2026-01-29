@@ -36,6 +36,7 @@ Key fields:
 - `lark`: webhook URL, batch size, flush interval, retry config.
 - `buffer`: in-memory queue size and drop policy.
 - `watcher`: polling interval for new log lines.
+  - `state_filename`: optional state file path; empty = store in `/tmp` with a per-log-dir hash.
 
 Environment overrides:
 - `LOG_DIRECTORY`
@@ -48,6 +49,7 @@ Environment overrides:
 - Logs are polled (not filesystem events), so very short-lived files could be missed.
 - Stack traces are intentionally ignored to reduce memory usage.
 - When `buffer.drop_oldest` is true and the buffer is full, the oldest entry is dropped to accept new entries.
+- The watcher saves its last read offset per log directory to avoid re-sending entries after restarts.
 
 ## Running as a systemd service
 This repo includes a sample unit file in `systemd.ini`. Copy it and adjust paths/user:

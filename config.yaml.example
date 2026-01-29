@@ -32,3 +32,4 @@ buffer:
 # File watcher settings
 watcher:
   poll_interval: 2s       # How often to check for new log lines
+  state_filename: ""      # Optional; empty = save state in /tmp with a per-log-dir hash

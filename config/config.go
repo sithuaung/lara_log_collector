@@ -10,13 +10,13 @@ import (
 
 // Config holds all configuration for the log collector
 type Config struct {
-	LogDirectory     string        `yaml:"log_directory"`
-	LogDirectories   []string      `yaml:"log_directories"`
-	AppName          string        `yaml:"app_name"`
-	MinLogLevel      string        `yaml:"min_log_level"`
-	Lark             LarkConfig    `yaml:"lark"`
-	Buffer           BufferConfig  `yaml:"buffer"`
-	Watcher          WatcherConfig `yaml:"watcher"`
+	LogDirectory   string        `yaml:"log_directory"`
+	LogDirectories []string      `yaml:"log_directories"`
+	AppName        string        `yaml:"app_name"`
+	MinLogLevel    string        `yaml:"min_log_level"`
+	Lark           LarkConfig    `yaml:"lark"`
+	Buffer         BufferConfig  `yaml:"buffer"`
+	Watcher        WatcherConfig `yaml:"watcher"`
 }
 
 // LarkConfig holds Lark webhook configuration
@@ -36,16 +36,17 @@ type BufferConfig struct {
 
 // WatcherConfig holds file watcher configuration
 type WatcherConfig struct {
-	PollInterval time.Duration `yaml:"poll_interval"`
+	PollInterval  time.Duration `yaml:"poll_interval"`
+	StateFilename string        `yaml:"state_filename"`
 }
 
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		LogDirectory:     "./storage/logs",
-		LogDirectories:   nil,
-		AppName:          "Laravel Logs",
-		MinLogLevel:      "ERROR",
+		LogDirectory:   "./storage/logs",
+		LogDirectories: nil,
+		AppName:        "Laravel Logs",
+		MinLogLevel:    "ERROR",
 		Lark: LarkConfig{
 			WebhookURL:    "",
 			BatchSize:     10,
@@ -58,7 +59,8 @@ func DefaultConfig() *Config {
 			DropOldest: true,
 		},
 		Watcher: WatcherConfig{
-			PollInterval: 1 * time.Second,
+			PollInterval:  1 * time.Second,
+			StateFilename: "",
 		},
 	}
 }

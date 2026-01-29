@@ -3,6 +3,8 @@ package watcher
 import (
 	"bufio"
 	"context"
+	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -28,6 +30,11 @@ type Watcher struct {
 	minLevel    models.LogLevel
 }
 
+type watchState struct {
+	File   string `json:"file"`
+	Offset int64  `json:"offset"`
+}
+
 // NewWatcher creates a new log file watcher
 func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string) *Watcher {
 	return &Watcher{
@@ -51,6 +58,8 @@ func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, 
 func (w *Watcher) Start(ctx context.Context) error {
 	ticker := time.NewTicker(w.cfg.PollInterval)
 	defer ticker.Stop()
+
+	w.initState()
 
 	// Initial check
 	if err := w.checkLogs(); err != nil {
@@ -162,6 +171,9 @@ func (w *Watcher) readNewLines(logFile string) error {
 		return fmt.Errorf("get offset: %w", err)
 	}
 	w.offset = newOffset
+	if err := w.saveState(); err != nil {
+		return fmt.Errorf("save state: %w", err)
+	}
 
 	return nil
 }
@@ -174,4 +186,86 @@ func (w *Watcher) GetCurrentFile() string {
 // ProcessEntry is a helper to manually push an entry (for testing)
 func (w *Watcher) ProcessEntry(entry *models.LogEntry) {
 	w.buffer.Push(entry)
+}
+
+func (w *Watcher) initState() {
+	logFile := w.getCurrentLogFile()
+	log.Printf("Watcher state file: %s", w.stateFilePath())
+	if err := w.loadState(logFile); err != nil {
+		log.Printf("Failed to load watcher state: %v", err)
+	}
+}
+
+func (w *Watcher) stateFilePath() string {
+	name := w.cfg.StateFilename
+	if name == "" {
+		sum := sha1.Sum([]byte(w.logDir))
+		name = fmt.Sprintf("lara_log_collector.%x.state.json", sum)
+		return filepath.Join(os.TempDir(), name)
+	}
+	if filepath.IsAbs(name) {
+		return name
+	}
+	return filepath.Join(w.logDir, name)
+}
+
+func (w *Watcher) loadState(logFile string) error {
+	data, err := os.ReadFile(w.stateFilePath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var state watchState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return err
+	}
+
+	if state.File != logFile {
+		return nil
+	}
+
+	w.currentFile = logFile
+	w.offset = state.Offset
+
+	if info, err := os.Stat(logFile); err == nil && info.Size() < w.offset {
+		w.offset = 0
+	}
+
+	return nil
+}
+
+func (w *Watcher) saveState() error {
+	if w.currentFile == "" {
+		return nil
+	}
+
+	state := watchState{
+		File:   w.currentFile,
+		Offset: w.offset,
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+
+	statePath := w.stateFilePath()
+	dir := filepath.Dir(statePath)
+	tmp, err := os.CreateTemp(dir, ".lara_log_collector.state.*.tmp")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+
+	return os.Rename(tmp.Name(), statePath)
 }
