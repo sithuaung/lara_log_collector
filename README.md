@@ -75,6 +75,13 @@ suppress:
   timezone: "Asia/Bangkok"
 ```
 
+## Daily summary behavior
+When `suppress` is configured, matching log lines are **not** sent immediately.
+Instead, the collector counts the suppressed occurrences and sends a single
+daily summary to Lark at `daily_report_time` in the configured `timezone`.
+The summary includes the total count per pattern (and app) observed during the
+day. If no suppressed errors occurred, no summary is sent.
+
 ## Notes
 - Logs are polled (not filesystem events), so very short-lived files could be missed.
 - Stack traces are intentionally ignored to reduce memory usage.
