@@ -17,6 +17,7 @@ type Config struct {
 	Lark           LarkConfig    `yaml:"lark"`
 	Buffer         BufferConfig  `yaml:"buffer"`
 	Watcher        WatcherConfig `yaml:"watcher"`
+	Suppress       SuppressConfig `yaml:"suppress"`
 }
 
 // LarkConfig holds Lark webhook configuration
@@ -40,6 +41,15 @@ type WatcherConfig struct {
 	StateFilename string        `yaml:"state_filename"`
 }
 
+// SuppressConfig holds suppression and daily summary settings
+type SuppressConfig struct {
+	Patterns         []string `yaml:"patterns"`
+	Match            string   `yaml:"match"`              // "substring" or "regex"
+	CaseInsensitive  bool     `yaml:"case_insensitive"`
+	DailyReportTime  string   `yaml:"daily_report_time"`  // "HH:MM"
+	Timezone         string   `yaml:"timezone"`           // e.g. "Asia/Bangkok"
+}
+
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
@@ -61,6 +71,13 @@ func DefaultConfig() *Config {
 		Watcher: WatcherConfig{
 			PollInterval:  1 * time.Second,
 			StateFilename: "",
+		},
+		Suppress: SuppressConfig{
+			Patterns:        nil,
+			Match:           "substring",
+			CaseInsensitive: true,
+			DailyReportTime: "17:00",
+			Timezone:        "Asia/Bangkok",
 		},
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/sithuaung/lara_log_collector/config"
 	"github.com/sithuaung/lara_log_collector/models"
 	"github.com/sithuaung/lara_log_collector/parser"
+	"github.com/sithuaung/lara_log_collector/suppressor"
 )
 
 // Watcher monitors Laravel log files and sends entries to the buffer
@@ -28,6 +29,7 @@ type Watcher struct {
 	currentFile string
 	offset      int64
 	minLevel    models.LogLevel
+	suppressor  *suppressor.Suppressor
 }
 
 type watchState struct {
@@ -36,7 +38,7 @@ type watchState struct {
 }
 
 // NewWatcher creates a new log file watcher
-func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string) *Watcher {
+func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, sup *suppressor.Suppressor) *Watcher {
 	return &Watcher{
 		cfg:      cfg,
 		logDir:   logDir,
@@ -44,12 +46,13 @@ func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, min
 		buffer:   buf,
 		parser:   parser.NewParser(),
 		minLevel: models.ParseLogLevel(minLogLevel),
+		suppressor: sup,
 	}
 }
 
 // NewWatcherWithApp creates a new log file watcher with an app name for tagging entries
-func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string) *Watcher {
-	w := NewWatcher(cfg, logDir, buf, minLogLevel)
+func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string, sup *suppressor.Suppressor) *Watcher {
+	w := NewWatcher(cfg, logDir, buf, minLogLevel, sup)
 	w.appName = appName
 	return w
 }
@@ -155,6 +158,12 @@ func (w *Watcher) readNewLines(logFile string) error {
 		if entry := w.parser.ParseLine(line); entry != nil {
 			// Filter by minimum log level
 			if entry.Level.Severity() >= w.minLevel.Severity() {
+				if w.suppressor != nil {
+					if matched, key := w.suppressor.Match(entry.Message); matched {
+						w.suppressor.Inc(w.appName, key)
+						continue
+					}
+				}
 				entry.AppName = w.appName
 				w.buffer.Push(entry)
 			}

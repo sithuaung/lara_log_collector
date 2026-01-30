@@ -37,6 +37,12 @@ Key fields:
 - `buffer`: in-memory queue size and drop policy.
 - `watcher`: polling interval for new log lines.
   - `state_filename`: optional state file path; empty = store in `/tmp` with a per-log-dir hash.
+- `suppress`: suppress unimportant errors and send a daily summary.
+  - `patterns`: list of patterns to suppress.
+  - `match`: `substring` (fast) or `regex` (flexible).
+  - `case_insensitive`: true/false.
+  - `daily_report_time`: report time in `HH:MM`.
+  - `timezone`: IANA timezone name (e.g., `Asia/Bangkok`).
 
 Environment overrides:
 - `LOG_DIRECTORY`
@@ -44,6 +50,30 @@ Environment overrides:
 - `APP_NAME`
 - `LARK_WEBHOOK_URL`
 - `MIN_LOG_LEVEL`
+
+Suppression example:
+```yaml
+suppress:
+  patterns:
+    - "Token signature mismatch"
+    - "some more error"
+  match: "substring"      # "substring" (fast) or "regex" (flexible)
+  case_insensitive: true
+  daily_report_time: "17:00"
+  timezone: "Asia/Bangkok"
+```
+
+Regex matching example:
+```yaml
+suppress:
+  patterns:
+    - "token signature (mismatch|invalid)"
+    - "^JWT .* expired$"
+  match: "regex"
+  case_insensitive: true
+  daily_report_time: "17:00"
+  timezone: "Asia/Bangkok"
+```
 
 ## Notes
 - Logs are polled (not filesystem events), so very short-lived files could be missed.

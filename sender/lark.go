@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -135,6 +136,10 @@ func (s *LarkSender) sendWithRetryForApp(entries []*models.LogEntry, appName str
 // send sends a batch of entries to Lark
 func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
 	card := s.buildCard(entries, appName)
+	return s.sendCard(card)
+}
+
+func (s *LarkSender) sendCard(card map[string]any) error {
 	payload := s.buildPayload(card)
 
 	body, err := json.Marshal(payload)
@@ -142,7 +147,7 @@ func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
 		return fmt.Errorf("marshal payload: %w", err)
 	}
 
-	log.Printf("Lark request: url=%s entries=%d payload_bytes=%d", redactWebhookURL(s.cfg.WebhookURL), len(entries), len(body))
+	log.Printf("Lark request: url=%s payload_bytes=%d", redactWebhookURL(s.cfg.WebhookURL), len(body))
 
 	req, err := http.NewRequest("POST", s.cfg.WebhookURL, bytes.NewReader(body))
 	if err != nil {
@@ -170,6 +175,34 @@ func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
 	}
 
 	return nil
+}
+
+// SendSuppressedSummary sends a daily summary of suppressed errors for an app.
+func (s *LarkSender) SendSuppressedSummary(appName string, date string, reportTime time.Time, counts map[string]int64) error {
+	if len(counts) == 0 {
+		return nil
+	}
+	card := s.buildSuppressedSummaryCard(appName, date, reportTime, counts)
+	return s.sendSummaryWithRetry(card)
+}
+
+func (s *LarkSender) sendSummaryWithRetry(card map[string]any) error {
+	var lastErr error
+	delay := s.cfg.RetryDelay
+
+	for attempt := 0; attempt <= s.cfg.MaxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(delay)
+			delay *= 2
+		}
+		if err := s.sendCard(card); err != nil {
+			lastErr = err
+			log.Printf("Lark summary send attempt %d failed: %v", attempt+1, err)
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }
 
 // buildPayload creates the Lark webhook payload
@@ -234,6 +267,50 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 			},
 		},
 		"elements": elements,
+	}
+}
+
+func (s *LarkSender) buildSuppressedSummaryCard(appName string, date string, reportTime time.Time, counts map[string]int64) map[string]any {
+	keys := make([]string, 0, len(counts))
+	var total int64
+	for k, v := range counts {
+		keys = append(keys, k)
+		total += v
+	}
+	sort.Strings(keys)
+
+	lines := make([]string, 0, len(keys)+1)
+	for _, k := range keys {
+		lines = append(lines, fmt.Sprintf("- %s — x%d", k, counts[k]))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, "- (none)")
+	}
+
+	content := fmt.Sprintf("Suppressed errors for %s (up to %s)\nTotal: %d\n%s",
+		date,
+		reportTime.Format("15:04 MST"),
+		total,
+		strings.Join(lines, "\n"),
+	)
+
+	return map[string]any{
+		"header": map[string]any{
+			"template": "blue",
+			"title": map[string]any{
+				"tag":     "plain_text",
+				"content": fmt.Sprintf("%s — suppressed summary", appName),
+			},
+		},
+		"elements": []map[string]any{
+			{
+				"tag": "div",
+				"text": map[string]any{
+					"tag":     "lark_md",
+					"content": content,
+				},
+			},
+		},
 	}
 }
 

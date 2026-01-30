@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/sithuaung/lara_log_collector/buffer"
 	"github.com/sithuaung/lara_log_collector/config"
 	"github.com/sithuaung/lara_log_collector/sender"
+	"github.com/sithuaung/lara_log_collector/suppressor"
 	"github.com/sithuaung/lara_log_collector/watcher"
 )
 
@@ -47,6 +49,17 @@ func main() {
 	log.Printf("  Buffer size: %d", cfg.Buffer.Size)
 	log.Printf("  Batch size: %d", cfg.Lark.BatchSize)
 
+	var sup *suppressor.Suppressor
+	if len(cfg.Suppress.Patterns) > 0 {
+		var err error
+		sup, err = suppressor.New(cfg.Suppress)
+		if err != nil {
+			log.Fatalf("Failed to init suppressor: %v", err)
+		}
+		log.Printf("  Suppressed patterns: %d (match=%s, case_insensitive=%t)", len(cfg.Suppress.Patterns), cfg.Suppress.Match, cfg.Suppress.CaseInsensitive)
+		log.Printf("  Suppress report time: %s %s", cfg.Suppress.DailyReportTime, cfg.Suppress.Timezone)
+	}
+
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -62,6 +75,10 @@ func main() {
 	logSender := sender.NewLarkSender(cfg.Lark, buf, cfg.AppName)
 	go logSender.Start(ctx)
 
+	if sup != nil {
+		go runSuppressedSummaryScheduler(ctx, logSender, sup, cfg.Suppress.DailyReportTime)
+	}
+
 	// Create and start watchers
 	errChan := make(chan error, len(logDirs))
 	for _, logDir := range logDirs {
@@ -73,7 +90,7 @@ func main() {
 			appName = deriveAppNameFromLogDir(logDir)
 		}
 		log.Printf("  Watching: %s (app=%s)", logDir, appName)
-		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel)
+		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel, sup)
 		go func(w *watcher.Watcher) {
 			errChan <- w.Start(ctx)
 		}(logWatcher)
@@ -96,6 +113,50 @@ func main() {
 	log.Printf("Final stats: received=%d, dropped=%d, pending=%d", received, dropped, pending)
 
 	log.Println("Shutdown complete")
+}
+
+func runSuppressedSummaryScheduler(ctx context.Context, logSender *sender.LarkSender, sup *suppressor.Suppressor, reportTime string) {
+	hour, minute, err := parseHourMinute(reportTime)
+	if err != nil {
+		log.Printf("Invalid suppress daily_report_time %q: %v (scheduler disabled)", reportTime, err)
+		return
+	}
+
+	loc := sup.Location()
+	for {
+		now := time.Now().In(loc)
+		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, loc)
+		if !now.Before(next) {
+			next = next.AddDate(0, 0, 1)
+		}
+
+		timer := time.NewTimer(time.Until(next))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+
+		date, byApp := sup.Snapshot()
+		reportAt := time.Now().In(loc)
+		for app, counts := range byApp {
+			if len(counts) == 0 {
+				continue
+			}
+			if err := logSender.SendSuppressedSummary(app, date, reportAt, counts); err != nil {
+				log.Printf("Failed to send suppressed summary (app=%q): %v", app, err)
+			}
+		}
+	}
+}
+
+func parseHourMinute(value string) (int, int, error) {
+	t, err := time.Parse("15:04", value)
+	if err != nil {
+		return 0, 0, err
+	}
+	return t.Hour(), t.Minute(), nil
 }
 
 func deriveAppNameFromLogDir(logDir string) string {

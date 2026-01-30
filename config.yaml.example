@@ -33,3 +33,13 @@ buffer:
 watcher:
   poll_interval: 2s       # How often to check for new log lines
   state_filename: ""      # Optional; empty = save state in /tmp with a per-log-dir hash
+
+# Suppress unimportant errors and send a daily summary at 5PM Thailand time
+suppress:
+  patterns:
+    - "Token signature mismatch"
+    - "some more error"
+  match: "substring"      # "substring" (fast) or "regex" (flexible)
+  case_insensitive: true
+  daily_report_time: "17:00"
+  timezone: "Asia/Bangkok"
