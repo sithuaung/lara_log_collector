@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -10,14 +9,18 @@ import (
 
 // Config holds all configuration for the log collector
 type Config struct {
-	LogDirectory   string        `yaml:"log_directory"`
-	LogDirectories []string      `yaml:"log_directories"`
-	AppName        string        `yaml:"app_name"`
-	MinLogLevel    string        `yaml:"min_log_level"`
-	Lark           LarkConfig    `yaml:"lark"`
-	Buffer         BufferConfig  `yaml:"buffer"`
-	Watcher        WatcherConfig `yaml:"watcher"`
-	Suppress       SuppressConfig `yaml:"suppress"`
+	Apps        []AppConfig    `yaml:"apps"`
+	MinLogLevel string         `yaml:"min_log_level"`
+	Lark        LarkConfig     `yaml:"lark"`
+	Buffer      BufferConfig   `yaml:"buffer"`
+	Watcher     WatcherConfig  `yaml:"watcher"`
+	Suppress    SuppressConfig `yaml:"suppress"`
+}
+
+// AppConfig binds an app name to its Laravel log directory.
+type AppConfig struct {
+	Name         string `yaml:"name"`
+	LogDirectory string `yaml:"log_directory"`
 }
 
 // LarkConfig holds Lark webhook configuration
@@ -43,20 +46,18 @@ type WatcherConfig struct {
 
 // SuppressConfig holds suppression and daily summary settings
 type SuppressConfig struct {
-	Patterns         []string `yaml:"patterns"`
-	Match            string   `yaml:"match"`              // "substring" or "regex"
-	CaseInsensitive  bool     `yaml:"case_insensitive"`
-	DailyReportTime  string   `yaml:"daily_report_time"`  // "HH:MM"
-	Timezone         string   `yaml:"timezone"`           // e.g. "Asia/Bangkok"
+	Patterns        []string `yaml:"patterns"`
+	Match           string   `yaml:"match"` // "substring" or "regex"
+	CaseInsensitive bool     `yaml:"case_insensitive"`
+	DailyReportTime string   `yaml:"daily_report_time"` // "HH:MM"
+	Timezone        string   `yaml:"timezone"`          // e.g. "Asia/Bangkok"
 }
 
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		LogDirectory:   "./storage/logs",
-		LogDirectories: nil,
-		AppName:        "Laravel Logs",
-		MinLogLevel:    "ERROR",
+		Apps:        nil,
+		MinLogLevel: "ERROR",
 		Lark: LarkConfig{
 			WebhookURL:    "",
 			BatchSize:     10,
@@ -106,15 +107,6 @@ func LoadConfig(path string) (*Config, error) {
 
 // applyEnvOverrides overrides config values from environment variables
 func (c *Config) applyEnvOverrides() {
-	if v := os.Getenv("LOG_DIRECTORY"); v != "" {
-		c.LogDirectory = v
-	}
-	if v := os.Getenv("LOG_DIRECTORIES"); v != "" {
-		c.LogDirectories = splitCommaList(v)
-	}
-	if v := os.Getenv("APP_NAME"); v != "" {
-		c.AppName = v
-	}
 	if v := os.Getenv("LARK_WEBHOOK_URL"); v != "" {
 		c.Lark.WebhookURL = v
 	}
@@ -123,13 +115,10 @@ func (c *Config) applyEnvOverrides() {
 	}
 }
 
-func splitCommaList(value string) []string {
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			out = append(out, trimmed)
-		}
+// ResolveApps returns explicit app configs.
+func (c *Config) ResolveApps() []AppConfig {
+	if c == nil {
+		return nil
 	}
-	return out
+	return c.Apps
 }

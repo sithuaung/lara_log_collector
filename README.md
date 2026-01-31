@@ -29,9 +29,8 @@ go build -o lara_log_collector .
 All settings are in `config.yaml`. See `config.yaml.example` for defaults.
 
 Key fields:
-- `log_directory`: single Laravel app log dir.
-- `log_directories`: list of app log dirs (preferred for multi-app); app name is derived from the directory.
-- `app_name`: default app name (used when `log_directories` is not set or cannot be derived).
+- `apps`: list of `{name, log_directory}` entries.
+  - If `name` is empty, it is derived from the directory (e.g. `/home/forge/APP/storage/logs` -> `APP`).
 - `min_log_level`: minimum level to send (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY).
 - `lark`: webhook URL, batch size, flush interval, retry config.
 - `buffer`: in-memory queue size and drop policy.
@@ -45,9 +44,6 @@ Key fields:
   - `timezone`: IANA timezone name (e.g., `Asia/Bangkok`).
 
 Environment overrides:
-- `LOG_DIRECTORY`
-- `LOG_DIRECTORIES` (comma-separated)
-- `APP_NAME`
 - `LARK_WEBHOOK_URL`
 - `MIN_LOG_LEVEL`
 

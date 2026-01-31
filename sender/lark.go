@@ -21,25 +21,23 @@ import (
 
 // LarkSender sends log entries to Lark webhook
 type LarkSender struct {
-	cfg              config.LarkConfig
-	client           *http.Client
-	buffer           *buffer.Buffer
-	batch            []*models.LogEntry
-	batchMu          sync.Mutex
-	flushTimer       *time.Timer
-	defaultAppName   string
+	cfg        config.LarkConfig
+	client     *http.Client
+	buffer     *buffer.Buffer
+	batch      []*models.LogEntry
+	batchMu    sync.Mutex
+	flushTimer *time.Timer
 }
 
 // NewLarkSender creates a new Lark webhook sender
-func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer, appName string) *LarkSender {
+func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer) *LarkSender {
 	return &LarkSender{
 		cfg: cfg,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		buffer:           buf,
-		batch:            make([]*models.LogEntry, 0, cfg.BatchSize),
-		defaultAppName:   appName,
+		buffer: buf,
+		batch:  make([]*models.LogEntry, 0, cfg.BatchSize),
 	}
 }
 
@@ -100,7 +98,7 @@ func (s *LarkSender) flushLocked() {
 
 // sendWithRetry sends entries with exponential backoff retry
 func (s *LarkSender) sendWithRetry(entries []*models.LogEntry) {
-	byApp := groupEntriesByApp(entries, s.defaultAppName)
+	byApp := groupEntriesByApp(entries)
 	for appName, batch := range byApp {
 		if len(batch) == 0 {
 			continue
@@ -370,12 +368,12 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 	return grouped
 }
 
-func groupEntriesByApp(entries []*models.LogEntry, defaultAppName string) map[string][]*models.LogEntry {
+func groupEntriesByApp(entries []*models.LogEntry) map[string][]*models.LogEntry {
 	byApp := make(map[string][]*models.LogEntry)
 	for _, entry := range entries {
 		appName := entry.AppName
 		if appName == "" {
-			appName = defaultAppName
+			appName = "Unknown App"
 		}
 		byApp[appName] = append(byApp[appName], entry)
 	}

@@ -33,17 +33,19 @@ func main() {
 		log.Fatal("Lark webhook URL is required (set in config or LARK_WEBHOOK_URL env)")
 	}
 
-	logDirs := cfg.LogDirectories
-	if len(logDirs) == 0 {
-		logDirs = []string{cfg.LogDirectory}
-	}
-
 	log.Printf("Starting Laravel Log Collector")
-	log.Printf("  App name (default): %s", cfg.AppName)
-	if len(logDirs) == 1 {
-		log.Printf("  Log directory: %s", logDirs[0])
-	} else {
-		log.Printf("  Log directories: %s", strings.Join(logDirs, ", "))
+	apps := cfg.ResolveApps()
+	if len(apps) == 0 {
+		log.Fatal("No log directories configured (set apps)")
+	}
+	if len(apps) == 1 {
+		log.Printf("  Log directory: %s", apps[0].LogDirectory)
+	} else if len(apps) > 1 {
+		dirs := make([]string, 0, len(apps))
+		for _, app := range apps {
+			dirs = append(dirs, app.LogDirectory)
+		}
+		log.Printf("  Log directories: %s", strings.Join(dirs, ", "))
 	}
 	log.Printf("  Min log level: %s", cfg.MinLogLevel)
 	log.Printf("  Buffer size: %d", cfg.Buffer.Size)
@@ -72,7 +74,7 @@ func main() {
 	buf := buffer.NewBuffer(cfg.Buffer.Size, cfg.Buffer.DropOldest)
 
 	// Create and start sender (interface makes it easy to swap implementations)
-	logSender := sender.NewLarkSender(cfg.Lark, buf, cfg.AppName)
+	logSender := sender.NewLarkSender(cfg.Lark, buf)
 	go logSender.Start(ctx)
 
 	if sup != nil {
@@ -80,12 +82,10 @@ func main() {
 	}
 
 	// Create and start watchers
-	errChan := make(chan error, len(logDirs))
-	for _, logDir := range logDirs {
-		appName := cfg.AppName
-		if len(cfg.LogDirectories) > 0 {
-			appName = deriveAppNameFromLogDir(logDir)
-		}
+	errChan := make(chan error, len(apps))
+	for _, app := range apps {
+		logDir := app.LogDirectory
+		appName := strings.TrimSpace(app.Name)
 		if appName == "" {
 			appName = deriveAppNameFromLogDir(logDir)
 		}

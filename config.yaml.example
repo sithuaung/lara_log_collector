@@ -1,17 +1,13 @@
 # Laravel Log Collector Configuration
 
-# Directory containing Laravel log files (single app)
-log_directory: "/home/forge/blog/storage/logs"
-
-# Directories containing Laravel log files (multiple apps)
-# If set, each directory is treated as a separate app, and the app name is derived
-# from the parent of "storage/logs" (e.g. /home/forge/APP/storage/logs -> APP).
-log_directories:
-   - "/home/forge/app_one/storage/logs"
-   - "/home/forge/app_two/storage/logs"
-
-# App Name
-app_name: "Default App Name"
+# Apps (name + log directory).
+# If name is empty, it is derived from the directory:
+# /home/forge/APP/storage/logs -> APP (handles /current/ symlink too).
+apps:
+  - name: "app_one"
+    log_directory: "/home/forge/app_one/storage/logs"
+  - name: "app_two"
+    log_directory: "/home/forge/app_two/storage/logs"
 
 # Minimum log level to collect (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY)
 min_log_level: "ERROR"
