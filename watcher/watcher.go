@@ -74,7 +74,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			// Flush any pending entries
 			if entry := w.parser.Flush(); entry != nil {
-				w.buffer.Push(entry)
+				w.handleEntry(entry)
 			}
 			return ctx.Err()
 
@@ -95,7 +95,7 @@ func (w *Watcher) checkLogs() error {
 	if logFile != w.currentFile {
 		// Flush parser for previous file
 		if entry := w.parser.Flush(); entry != nil {
-			w.buffer.Push(entry)
+			w.handleEntry(entry)
 		}
 		w.currentFile = logFile
 		w.offset = 0
@@ -156,17 +156,7 @@ func (w *Watcher) readNewLines(logFile string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if entry := w.parser.ParseLine(line); entry != nil {
-			// Filter by minimum log level
-			if entry.Level.Severity() >= w.minLevel.Severity() {
-				if w.suppressor != nil {
-					if matched, key := w.suppressor.Match(entry.Message); matched {
-						w.suppressor.Inc(w.appName, key)
-						continue
-					}
-				}
-				entry.AppName = w.appName
-				w.buffer.Push(entry)
-			}
+			w.handleEntry(entry)
 		}
 	}
 
@@ -194,6 +184,24 @@ func (w *Watcher) GetCurrentFile() string {
 
 // ProcessEntry is a helper to manually push an entry (for testing)
 func (w *Watcher) ProcessEntry(entry *models.LogEntry) {
+	w.buffer.Push(entry)
+}
+
+func (w *Watcher) handleEntry(entry *models.LogEntry) {
+	if entry == nil {
+		return
+	}
+	// Filter by minimum log level
+	if entry.Level.Severity() < w.minLevel.Severity() {
+		return
+	}
+	if w.suppressor != nil {
+		if matched, key := w.suppressor.Match(entry.Message); matched {
+			w.suppressor.Inc(w.appName, key)
+			return
+		}
+	}
+	entry.AppName = w.appName
 	w.buffer.Push(entry)
 }
 
