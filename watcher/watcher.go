@@ -40,12 +40,12 @@ type watchState struct {
 // NewWatcher creates a new log file watcher
 func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, sup *suppressor.Suppressor) *Watcher {
 	return &Watcher{
-		cfg:      cfg,
-		logDir:   logDir,
-		appName:  "",
-		buffer:   buf,
-		parser:   parser.NewParser(),
-		minLevel: models.ParseLogLevel(minLogLevel),
+		cfg:        cfg,
+		logDir:     logDir,
+		appName:    "",
+		buffer:     buf,
+		parser:     parser.NewParser(),
+		minLevel:   models.ParseLogLevel(minLogLevel),
 		suppressor: sup,
 	}
 }
@@ -127,9 +127,16 @@ func (w *Watcher) checkLogs() error {
 
 // getCurrentLogFile returns the path to today's log file
 func (w *Watcher) getCurrentLogFile() string {
-	filename := "laravel-" + time.Now().UTC().Format("2006-01-02") + ".log"
+	nowLocal := time.Now()
+	nowUTC := nowLocal.UTC()
+	filename := "laravel-" + nowUTC.Format("2006-01-02") + ".log"
 
-	fmt.Println("File name scanned " + filename)
+	log.Printf(
+		"File name scanned %s | pull_at_local=%s | pull_at_utc=%s",
+		filename,
+		nowLocal.Format(time.RFC3339),
+		nowUTC.Format(time.RFC3339),
+	)
 
 	return filepath.Join(w.logDir, filename)
 }
