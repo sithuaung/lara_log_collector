@@ -116,8 +116,12 @@ func (w *Watcher) checkLogs() error {
 		w.offset = 0
 	}
 
-	// Nothing new to read
+	// Nothing new to read — flush any pending parser entry
+	// since all lines for the current entry have been written
 	if info.Size() == w.offset {
+		if entry := w.parser.Flush(); entry != nil {
+			w.handleEntry(entry)
+		}
 		return nil
 	}
 
@@ -169,6 +173,12 @@ func (w *Watcher) readNewLines(logFile string) error {
 
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("scan: %w", err)
+	}
+
+	// Flush any pending entry before saving state so a restart
+	// never skips past an entry the parser was still holding.
+	if entry := w.parser.Flush(); entry != nil {
+		w.handleEntry(entry)
 	}
 
 	// Update offset
