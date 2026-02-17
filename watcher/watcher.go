@@ -135,12 +135,6 @@ func (w *Watcher) getCurrentLogFile() string {
 	nowUTC := nowLocal.UTC()
 	filename := "laravel-" + nowUTC.Format("2006-01-02") + ".log"
 
-	log.Printf(
-		"File name scanned %s | pull_at_utc=%s",
-		filename,
-		nowUTC.Format(time.RFC3339),
-	)
-
 	return filepath.Join(w.logDir, filename)
 }
 

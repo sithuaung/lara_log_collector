@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -145,8 +144,6 @@ func (s *LarkSender) sendCard(card map[string]any) error {
 		return fmt.Errorf("marshal payload: %w", err)
 	}
 
-	log.Printf("Lark request: url=%s payload_bytes=%d", redactWebhookURL(s.cfg.WebhookURL), len(body))
-
 	req, err := http.NewRequest("POST", s.cfg.WebhookURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -161,16 +158,10 @@ func (s *LarkSender) sendCard(card map[string]any) error {
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		log.Printf("Lark response: status=%d body=%q", resp.StatusCode, truncateString(string(respBody), 1000))
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	respBody, _ := io.ReadAll(resp.Body)
-	if len(respBody) > 0 {
-		log.Printf("Lark response: status=%d body=%q", resp.StatusCode, truncateString(string(respBody), 1000))
-	} else {
-		log.Printf("Lark response: status=%d", resp.StatusCode)
-	}
+	_, _ = io.ReadAll(resp.Body)
 
 	return nil
 }
@@ -312,15 +303,6 @@ func (s *LarkSender) buildSuppressedSummaryCard(appName string, date string, rep
 	}
 }
 
-// truncateString truncates a string to maxLen with ellipsis
-func truncateString(s string, maxLen int) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
 type groupedEntry struct {
 	Level       models.LogLevel
 	Environment string
@@ -378,22 +360,4 @@ func groupEntriesByApp(entries []*models.LogEntry) map[string][]*models.LogEntry
 		byApp[appName] = append(byApp[appName], entry)
 	}
 	return byApp
-}
-
-func redactWebhookURL(raw string) string {
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return "***"
-	}
-
-	path := strings.TrimSuffix(parsed.Path, "/")
-	parts := strings.Split(path, "/")
-	if len(parts) > 0 {
-		parts[len(parts)-1] = "***"
-	}
-	parsed.Path = strings.Join(parts, "/")
-	parsed.RawQuery = ""
-	parsed.Fragment = ""
-
-	return parsed.String()
 }
