@@ -2,6 +2,13 @@
 
 Lightweight daemon that tails Laravel log files and sends grouped alerts to a Lark webhook. It polls `storage/logs/laravel-YYYY-MM-DD.log`, parses entries, batches them, and posts a Lark card per app.
 
+## Why use this?
+- **Error deduplication** — Repeated errors are grouped and counted rather than sent individually, making it easy to trace issues during high-frequency error bursts.
+- **Configurable alert intervals** — Instead of flooding Lark or Telegram with every error in real time, alerts are batched at a configurable polling interval to keep messaging channels clean and readable.
+- **Noise suppression** — Define patterns for low-priority errors to suppress them from immediate alerts and receive a single daily summary instead.
+- **Minimal memory footprint** — Only a hash map of error signatures and their counts is held in memory; it is cleared after each pull, keeping resource usage negligible.
+- **Zero infrastructure overhead** — Runs as a standalone lightweight service alongside your application, eliminating the need for additional queue workers. Think of it as a mini Fluentbit for Laravel logs.
+
 ## What it does
 - Watches one or many Laravel `storage/logs` directories.
 - Parses standard Laravel log lines (`[YYYY-MM-DD HH:MM:SS] env.LEVEL: message`).
@@ -114,3 +121,6 @@ sudo systemctl restart lara_log_collector
 ## Troubleshooting
 - If nothing is sent, verify the log path and that the current file is named `laravel-YYYY-MM-DD.log`.
 - If the webhook is required but missing, the app exits with an error.
+
+## Acknowledgements
+This project was largely written with the help of [OpenAI Codex](https://openai.com/codex) and [Claude Code](https://claude.ai/claude-code).
