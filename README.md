@@ -22,7 +22,7 @@ The values below are the production Taskfile settings. Each app has its own log 
 
 ```mermaid
 flowchart TD
-    Files["Laravel daily log files"] --> Watch["Poll every 2 seconds and read new lines"]
+    Files["Laravel daily log files"] --> Watch["Poll every 3 seconds and read new lines"]
     Watch --> Parse["Parse log entries"]
     Parse --> Level{"ERROR or higher?"}
     Level -->|No| Ignore["Skip alert"]
@@ -37,7 +37,7 @@ flowchart TD
     Send --> Lark
 ```
 
-Full batches send immediately. The flush timer is not a rate limit or a delivery deadline: while a batch is being sent or retried, the sender stops draining the queue. Daily summaries run separately from this batch pipeline.
+Full batches become ready immediately. Webhook requests are spaced by `lark.min_send_interval` (default 3 seconds), shared across apps, retries, and daily summaries. The flush timer is not a rate limit or a delivery deadline: while a batch is being sent or retried, the sender stops draining the queue. Daily summaries run separately from this batch pipeline.
 
 ## Overload and failure flow
 
@@ -91,8 +91,10 @@ Key fields:
 - `min_log_level`: minimum level to send (DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY).
 - `include_stacktrace`: include the Laravel `[stacktrace]` section in alerts (default `false`).
 - `lark`: webhook URL, batch size, flush interval, retry config.
+  - `min_send_interval`: minimum spacing between webhook requests (default `3s`; `0s` disables pacing), shared across batches, apps, retries, and summaries.
+  - HTTP 200 responses containing nonzero Lark error codes are treated as failed sends.
 - `buffer`: in-memory queue size and drop policy.
-- `watcher`: polling interval for new log lines.
+- `watcher`: polling interval for new log lines (default 3 seconds).
   - `state_filename`: optional state file path; empty = store in `/tmp` with a per-log-dir hash.
 - `suppress`: suppress unimportant errors and send a daily summary.
   - `patterns`: list of patterns to suppress.

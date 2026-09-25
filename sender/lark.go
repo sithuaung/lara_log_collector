@@ -26,6 +26,8 @@ type LarkSender struct {
 	batch      []*models.LogEntry
 	batchMu    sync.Mutex
 	flushTimer *time.Timer
+	sendMu     sync.Mutex
+	lastSend   time.Time
 }
 
 // NewLarkSender creates a new Lark webhook sender
@@ -140,6 +142,13 @@ func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
 }
 
 func (s *LarkSender) sendCard(card map[string]any) error {
+	// Share pacing across batches, apps, retries, and daily summaries.
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+	if wait := time.Until(s.lastSend.Add(s.cfg.MinSendInterval)); wait > 0 {
+		time.Sleep(wait)
+	}
+	s.lastSend = time.Now()
 	payload := s.buildPayload(card)
 
 	body, err := json.Marshal(payload)
@@ -164,7 +173,16 @@ func (s *LarkSender) sendCard(card map[string]any) error {
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	_, _ = io.ReadAll(resp.Body)
+	var result struct {
+		Code       int `json:"code"`
+		StatusCode int `json:"StatusCode"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&result); err != nil {
+		return fmt.Errorf("decode Lark response: %w", err)
+	}
+	if result.Code != 0 || result.StatusCode != 0 {
+		return fmt.Errorf("Lark rejected card: code=%d StatusCode=%d", result.Code, result.StatusCode)
+	}
 
 	return nil
 }

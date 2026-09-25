@@ -26,11 +26,12 @@ type AppConfig struct {
 
 // LarkConfig holds Lark webhook configuration
 type LarkConfig struct {
-	WebhookURL    string        `yaml:"webhook_url"`
-	BatchSize     int           `yaml:"batch_size"`
-	FlushInterval time.Duration `yaml:"flush_interval"`
-	MaxRetries    int           `yaml:"max_retries"`
-	RetryDelay    time.Duration `yaml:"retry_delay"`
+	WebhookURL      string        `yaml:"webhook_url"`
+	BatchSize       int           `yaml:"batch_size"`
+	FlushInterval   time.Duration `yaml:"flush_interval"`
+	MinSendInterval time.Duration `yaml:"min_send_interval"`
+	MaxRetries      int           `yaml:"max_retries"`
+	RetryDelay      time.Duration `yaml:"retry_delay"`
 }
 
 // BufferConfig holds buffer configuration
@@ -61,18 +62,19 @@ func DefaultConfig() *Config {
 		MinLogLevel:       "ERROR",
 		IncludeStacktrace: false,
 		Lark: LarkConfig{
-			WebhookURL:    "",
-			BatchSize:     10,
-			FlushInterval: 5 * time.Second,
-			MaxRetries:    3,
-			RetryDelay:    1 * time.Second,
+			WebhookURL:      "",
+			BatchSize:       10,
+			FlushInterval:   5 * time.Second,
+			MinSendInterval: 3 * time.Second,
+			MaxRetries:      3,
+			RetryDelay:      1 * time.Second,
 		},
 		Buffer: BufferConfig{
 			Size:       10000,
 			DropOldest: true,
 		},
 		Watcher: WatcherConfig{
-			PollInterval:  1 * time.Second,
+			PollInterval:  3 * time.Second,
 			StateFilename: "",
 		},
 		Suppress: SuppressConfig{
