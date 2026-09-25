@@ -9,12 +9,13 @@ import (
 
 // Config holds all configuration for the log collector
 type Config struct {
-	Apps        []AppConfig    `yaml:"apps"`
-	MinLogLevel string         `yaml:"min_log_level"`
-	Lark        LarkConfig     `yaml:"lark"`
-	Buffer      BufferConfig   `yaml:"buffer"`
-	Watcher     WatcherConfig  `yaml:"watcher"`
-	Suppress    SuppressConfig `yaml:"suppress"`
+	Apps              []AppConfig    `yaml:"apps"`
+	MinLogLevel       string         `yaml:"min_log_level"`
+	IncludeStacktrace bool           `yaml:"include_stacktrace"`
+	Lark              LarkConfig     `yaml:"lark"`
+	Buffer            BufferConfig   `yaml:"buffer"`
+	Watcher           WatcherConfig  `yaml:"watcher"`
+	Suppress          SuppressConfig `yaml:"suppress"`
 }
 
 // AppConfig binds an app name to its Laravel log directory.
@@ -56,8 +57,9 @@ type SuppressConfig struct {
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		Apps:        nil,
-		MinLogLevel: "ERROR",
+		Apps:              nil,
+		MinLogLevel:       "ERROR",
+		IncludeStacktrace: false,
 		Lark: LarkConfig{
 			WebhookURL:    "",
 			BatchSize:     10,

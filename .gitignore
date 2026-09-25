@@ -15,3 +15,5 @@ webhooks.md
 config.yaml
 .gocache/
 _dev/
+.DS_Store
+.nvimlog

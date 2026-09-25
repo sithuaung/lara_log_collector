@@ -43,6 +43,7 @@ func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer) *LarkSender {
 // Start begins processing log entries from the buffer
 func (s *LarkSender) Start(ctx context.Context) {
 	s.flushTimer = time.NewTimer(s.cfg.FlushInterval)
+	defer s.flushTimer.Stop()
 
 	for {
 		select {
@@ -92,7 +93,9 @@ func (s *LarkSender) flushLocked() {
 	entries := s.batch
 	s.batch = make([]*models.LogEntry, 0, s.cfg.BatchSize)
 
-	go s.sendWithRetry(entries)
+	// Send inline so slow requests and retries apply backpressure to the
+	// bounded entry buffer instead of creating unlimited in-flight batches.
+	s.sendWithRetry(entries)
 }
 
 // sendWithRetry sends entries with exponential backoff retry
@@ -237,7 +240,6 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 			},
 		})
 
-		// Message (trimmed to configured max length)
 		elements = append(elements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{

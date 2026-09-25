@@ -20,11 +20,13 @@ var (
 type Parser struct {
 	currentEntry       *models.LogEntry
 	ignoringStacktrace bool
+	includeStacktrace  bool
 }
 
 // NewParser creates a new log parser
-func NewParser() *Parser {
-	return &Parser{}
+func NewParser(includeStacktrace ...bool) *Parser {
+	include := len(includeStacktrace) > 0 && includeStacktrace[0]
+	return &Parser{includeStacktrace: include}
 }
 
 // ParseLine parses a single log line and returns a log entry if complete
@@ -45,8 +47,8 @@ func (p *Parser) ParseLine(line string) *models.LogEntry {
 		}
 
 		// Start a new entry
-		p.currentEntry = p.parseNewEntry(matches, line)
 		p.ignoringStacktrace = false
+		p.currentEntry = p.parseNewEntry(matches, line)
 
 		return completed
 	}
@@ -80,7 +82,10 @@ func (p *Parser) parseNewEntry(matches []string, rawLine string) *models.LogEntr
 	// Parse message and optional JSON context
 	message := matches[4]
 	entry.Message, entry.Context = parseMessageAndContext(message)
-	entry.Message = stripStacktrace(entry.Message)
+	if !p.includeStacktrace {
+		entry.Message = stripStacktrace(entry.Message)
+		p.ignoringStacktrace = strings.Contains(strings.ToLower(message), "[stacktrace]")
+	}
 
 	return entry
 }
@@ -141,6 +146,14 @@ func stripStacktrace(message string) string {
 }
 
 func (p *Parser) appendContinuationLine(line string) {
+	if p.includeStacktrace {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			p.currentEntry.Message = appendMessageLine(p.currentEntry.Message, line)
+		}
+		return
+	}
+
 	if p.ignoringStacktrace {
 		return
 	}

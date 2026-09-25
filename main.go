@@ -90,7 +90,7 @@ func main() {
 			appName = deriveAppNameFromLogDir(logDir)
 		}
 		log.Printf("  Watching: %s (app=%s)", logDir, appName)
-		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel, sup)
+		logWatcher := watcher.NewWatcherWithApp(cfg.Watcher, logDir, appName, buf, cfg.MinLogLevel, cfg.IncludeStacktrace, sup)
 		go func(w *watcher.Watcher) {
 			errChan <- w.Start(ctx)
 		}(logWatcher)

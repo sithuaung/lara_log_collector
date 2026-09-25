@@ -21,15 +21,16 @@ import (
 
 // Watcher monitors Laravel log files and sends entries to the buffer
 type Watcher struct {
-	cfg         config.WatcherConfig
-	logDir      string
-	appName     string
-	buffer      *buffer.Buffer
-	parser      *parser.Parser
-	currentFile string
-	offset      int64
-	minLevel    models.LogLevel
-	suppressor  *suppressor.Suppressor
+	cfg               config.WatcherConfig
+	logDir            string
+	appName           string
+	buffer            *buffer.Buffer
+	parser            *parser.Parser
+	currentFile       string
+	offset            int64
+	minLevel          models.LogLevel
+	includeStacktrace bool
+	suppressor        *suppressor.Suppressor
 }
 
 type watchState struct {
@@ -38,21 +39,22 @@ type watchState struct {
 }
 
 // NewWatcher creates a new log file watcher
-func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, sup *suppressor.Suppressor) *Watcher {
+func NewWatcher(cfg config.WatcherConfig, logDir string, buf *buffer.Buffer, minLogLevel string, includeStacktrace bool, sup *suppressor.Suppressor) *Watcher {
 	return &Watcher{
-		cfg:        cfg,
-		logDir:     logDir,
-		appName:    "",
-		buffer:     buf,
-		parser:     parser.NewParser(),
-		minLevel:   models.ParseLogLevel(minLogLevel),
-		suppressor: sup,
+		cfg:               cfg,
+		logDir:            logDir,
+		appName:           "",
+		buffer:            buf,
+		parser:            parser.NewParser(includeStacktrace),
+		minLevel:          models.ParseLogLevel(minLogLevel),
+		includeStacktrace: includeStacktrace,
+		suppressor:        sup,
 	}
 }
 
 // NewWatcherWithApp creates a new log file watcher with an app name for tagging entries
-func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string, sup *suppressor.Suppressor) *Watcher {
-	w := NewWatcher(cfg, logDir, buf, minLogLevel, sup)
+func NewWatcherWithApp(cfg config.WatcherConfig, logDir string, appName string, buf *buffer.Buffer, minLogLevel string, includeStacktrace bool, sup *suppressor.Suppressor) *Watcher {
+	w := NewWatcher(cfg, logDir, buf, minLogLevel, includeStacktrace, sup)
 	w.appName = appName
 	return w
 }
@@ -99,7 +101,7 @@ func (w *Watcher) checkLogs() error {
 		}
 		w.currentFile = logFile
 		w.offset = 0
-		w.parser = parser.NewParser()
+		w.parser = parser.NewParser(w.includeStacktrace)
 	}
 
 	// Check if file exists
