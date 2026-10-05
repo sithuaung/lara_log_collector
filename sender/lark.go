@@ -292,10 +292,22 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 			"template": headerColor,
 			"title": map[string]any{
 				"tag":     "plain_text",
-				"content": fmt.Sprintf("%s (%d entries, %d groups)", appName, total, len(grouped)),
+				"content": appName,
+			},
+			"text_tag_list": []map[string]any{
+				textTag(fmt.Sprintf("%d entries", total), "orange"),
+				textTag(fmt.Sprintf("%d groups", len(grouped)), "orange"),
 			},
 		},
 		"elements": elements,
+	}
+}
+
+func textTag(content, color string) map[string]any {
+	return map[string]any{
+		"tag":   "text_tag",
+		"text":  map[string]any{"tag": "plain_text", "content": content},
+		"color": color,
 	}
 }
 
