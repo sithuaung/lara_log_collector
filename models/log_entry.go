@@ -26,6 +26,8 @@ type LogEntry struct {
 	StackTrace  string         `json:"stack_trace,omitempty"`
 	RawLine     string         `json:"raw_line"`
 	AppName     string         `json:"app_name"`
+	// Occurrences is how many log lines this entry stands for after dedup; 0 means 1.
+	Occurrences int `json:"-"`
 }
 
 // IsError returns true if the log level is ERROR or higher severity

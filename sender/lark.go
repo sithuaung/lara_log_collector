@@ -28,6 +28,7 @@ type LarkSender struct {
 	flushTimer *time.Timer
 	sendMu     sync.Mutex
 	lastSend   time.Time
+	dedup      *deduper
 }
 
 // NewLarkSender creates a new Lark webhook sender
@@ -39,6 +40,7 @@ func NewLarkSender(cfg config.LarkConfig, buf *buffer.Buffer) *LarkSender {
 		},
 		buffer: buf,
 		batch:  make([]*models.LogEntry, 0, cfg.BatchSize),
+		dedup:  newDeduper(cfg.DedupWindow),
 	}
 }
 
@@ -50,12 +52,12 @@ func (s *LarkSender) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.flush()
+			s.flushFinal()
 			return
 
 		case entry, ok := <-s.buffer.Channel():
 			if !ok {
-				s.flush()
+				s.flushFinal()
 				return
 			}
 			s.addToBatch(entry)
@@ -86,14 +88,24 @@ func (s *LarkSender) flush() {
 	s.flushLocked()
 }
 
+// flushFinal sends the batch plus every pending dedup summary
+func (s *LarkSender) flushFinal() {
+	s.batchMu.Lock()
+	defer s.batchMu.Unlock()
+	s.flushBatchLocked(true)
+}
+
 // flushLocked sends the batch (must hold batchMu)
 func (s *LarkSender) flushLocked() {
-	if len(s.batch) == 0 {
+	s.flushBatchLocked(false)
+}
+
+func (s *LarkSender) flushBatchLocked(final bool) {
+	entries := s.dedup.filter(s.batch, time.Now(), final)
+	s.batch = make([]*models.LogEntry, 0, s.cfg.BatchSize)
+	if len(entries) == 0 {
 		return
 	}
-
-	entries := s.batch
-	s.batch = make([]*models.LogEntry, 0, s.cfg.BatchSize)
 
 	// Send inline so slow requests and retries apply backpressure to the
 	// bounded entry buffer instead of creating unlimited in-flight batches.
@@ -240,6 +252,10 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 
 	grouped := groupEntries(entries)
 	elements := make([]map[string]any, 0, len(grouped)*2)
+	total := 0
+	for _, g := range grouped {
+		total += g.Count
+	}
 
 	for i, g := range grouped {
 		// Add divider between entries
@@ -250,11 +266,15 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 		}
 
 		// Log level and timestamp
+		header := fmt.Sprintf("**[%s]** %s | %s (x%d)", g.Level, g.Environment, g.Timestamp.Format("2006-01-02 15:04:05"), g.Count)
+		if g.Deduped {
+			header += fmt.Sprintf(" — repeats held back by %s dedup", s.cfg.DedupWindow)
+		}
 		elements = append(elements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{
 				"tag":     "lark_md",
-				"content": fmt.Sprintf("**[%s]** %s | %s (x%d)", g.Level, g.Environment, g.Timestamp.Format("2006-01-02 15:04:05"), g.Count),
+				"content": header,
 			},
 		})
 
@@ -272,7 +292,7 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 			"template": headerColor,
 			"title": map[string]any{
 				"tag":     "plain_text",
-				"content": fmt.Sprintf("%s (%d entries, %d groups)", appName, len(entries), len(grouped)),
+				"content": fmt.Sprintf("%s (%d entries, %d groups)", appName, total, len(grouped)),
 			},
 		},
 		"elements": elements,
@@ -329,6 +349,7 @@ type groupedEntry struct {
 	Timestamp   time.Time
 	Message     string
 	Count       int
+	Deduped     bool
 }
 
 func groupEntries(entries []*models.LogEntry) []groupedEntry {
@@ -342,9 +363,12 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 	for _, entry := range entries {
 		message := entry.Message
 		key := fmt.Sprintf("%s|%s", entry.Level, message)
+		count := max(entry.Occurrences, 1)
+		deduped := entry.Occurrences > 0
 
 		if existing, ok := byKey[key]; ok {
-			existing.Count++
+			existing.Count += count
+			existing.Deduped = existing.Deduped || deduped
 			if entry.Timestamp.After(existing.Timestamp) {
 				existing.Timestamp = entry.Timestamp
 				existing.Environment = entry.Environment
@@ -357,7 +381,8 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 			Environment: entry.Environment,
 			Timestamp:   entry.Timestamp,
 			Message:     message,
-			Count:       1,
+			Count:       count,
+			Deduped:     deduped,
 		}
 		order = append(order, key)
 	}

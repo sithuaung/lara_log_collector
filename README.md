@@ -92,6 +92,7 @@ Key fields:
 - `include_stacktrace`: include the Laravel `[stacktrace]` section in alerts (default `false`).
 - `lark`: webhook URL, batch size, flush interval, retry config.
   - `min_send_interval`: minimum spacing between webhook requests (default `3s`; `0s` disables pacing), shared across batches, apps, retries, and summaries.
+  - `dedup_window`: after an error (same app, level, message) is sent, identical repeats are held back for this long and then sent as one entry with their count (default `10m`; `0s` disables).
   - HTTP 200 responses containing nonzero Lark error codes are treated as failed sends.
 - `buffer`: in-memory queue size and drop policy.
 - `watcher`: polling interval for new log lines (default 3 seconds).

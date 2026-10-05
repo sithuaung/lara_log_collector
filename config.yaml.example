@@ -21,6 +21,7 @@ lark:
   batch_size: 100          # Number of log entries to batch before sending
   flush_interval: 5s      # Timer trigger for a partial batch; sending can take longer
   min_send_interval: 3s   # Minimum time between webhook requests, including retries
+  dedup_window: 10m       # Identical errors after the first are held back and sent as one count per window; 0s disables
   max_retries: 3          # Number of retry attempts on failure
   retry_delay: 1s         # Initial delay between retries (doubles each retry)
 

@@ -32,6 +32,7 @@ type LarkConfig struct {
 	MinSendInterval time.Duration `yaml:"min_send_interval"`
 	MaxRetries      int           `yaml:"max_retries"`
 	RetryDelay      time.Duration `yaml:"retry_delay"`
+	DedupWindow     time.Duration `yaml:"dedup_window"` // hold back identical errors after the first send; 0 disables
 }
 
 // BufferConfig holds buffer configuration
@@ -68,6 +69,7 @@ func DefaultConfig() *Config {
 			MinSendInterval: 3 * time.Second,
 			MaxRetries:      3,
 			RetryDelay:      1 * time.Second,
+			DedupWindow:     10 * time.Minute,
 		},
 		Buffer: BufferConfig{
 			Size:       10000,
