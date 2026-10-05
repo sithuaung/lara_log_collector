@@ -362,7 +362,7 @@ func groupEntries(entries []*models.LogEntry) []groupedEntry {
 
 	for _, entry := range entries {
 		message := entry.Message
-		key := fmt.Sprintf("%s|%s", entry.Level, message)
+		key := fmt.Sprintf("%s|%s", entry.Level, messageKey(message))
 		count := max(entry.Occurrences, 1)
 		deduped := entry.Occurrences > 0
 

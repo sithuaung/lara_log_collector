@@ -2,6 +2,7 @@ package sender
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sithuaung/lara_log_collector/models"
@@ -25,7 +26,16 @@ func newDeduper(window time.Duration) *deduper {
 }
 
 func dedupKey(e *models.LogEntry) string {
-	return e.AppName + "|" + string(e.Level) + "|" + e.Message
+	return e.AppName + "|" + string(e.Level) + "|" + messageKey(e.Message)
+}
+
+// messageKey drops Laravel's trailing JSON context (userId, exception path...)
+// so the same error from different users or releases matches.
+func messageKey(message string) string {
+	if i := strings.Index(message, ` {"`); i > 0 {
+		return message[:i]
+	}
+	return message
 }
 
 // filter returns the entries to send now. force flushes every pending summary (used on shutdown).

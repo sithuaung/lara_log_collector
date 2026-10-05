@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -60,5 +61,18 @@ func TestDedupDisabled(t *testing.T) {
 	d := newDeduper(0)
 	if out := d.filter([]*models.LogEntry{authErr(), authErr()}, time.Now(), false); len(out) != 2 {
 		t.Fatalf("got %d", len(out))
+	}
+}
+
+func TestDedupIgnoresContext(t *testing.T) {
+	d := newDeduper(10 * time.Minute)
+	t0 := time.Now()
+	msg := `Auth guard [internal] is not defined. {"userId":%d,"exception":"..."}`
+	a := authErr()
+	a.Message = fmt.Sprintf(msg, 7)
+	b := authErr()
+	b.Message = fmt.Sprintf(msg, 54)
+	if out := d.filter([]*models.LogEntry{a, b}, t0, false); len(out) != 1 {
+		t.Fatalf("different userId should dedup, got %d", len(out))
 	}
 }
