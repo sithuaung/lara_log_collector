@@ -73,12 +73,8 @@ func (d *deduper) filter(entries []*models.LogEntry, now time.Time, force bool) 
 		summary := *st.latest
 		summary.Occurrences = st.suppressed
 		summaries = append(summaries, &summary)
-		if force {
-			delete(d.seen, k)
-		} else {
-			// Keep the key in a fresh window so ongoing repeats roll up again.
-			d.seen[k] = &dedupState{windowStart: now}
-		}
+		// Clear the key so the next occurrence after the summary sends immediately.
+		delete(d.seen, k)
 	}
 	sort.Slice(summaries, func(i, j int) bool { return summaries[i].Timestamp.Before(summaries[j].Timestamp) })
 

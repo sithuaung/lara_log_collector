@@ -36,6 +36,21 @@ func TestDedupHoldsRepeatsAndSummarisesAfterWindow(t *testing.T) {
 	}
 }
 
+func TestDedupSendsImmediatelyAfterSummary(t *testing.T) {
+	d := newDeduper(30 * time.Second)
+	t0 := time.Now()
+	d.filter([]*models.LogEntry{authErr()}, t0, false)
+	d.filter([]*models.LogEntry{authErr(), authErr()}, t0.Add(5*time.Second), false)
+	if out := d.filter(nil, t0.Add(30*time.Second), false); len(out) != 1 || out[0].Occurrences != 2 {
+		t.Fatalf("summary: got %+v", out)
+	}
+
+	out := d.filter([]*models.LogEntry{authErr()}, t0.Add(40*time.Second), false)
+	if len(out) != 1 || out[0].Occurrences != 0 {
+		t.Fatalf("occurrence after summary should send immediately as fresh, got %+v", out)
+	}
+}
+
 func TestDedupFoldsHeldRepeatsIntoNextSend(t *testing.T) {
 	d := newDeduper(time.Minute)
 	t0 := time.Now()
