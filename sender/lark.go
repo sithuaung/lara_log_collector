@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/sithuaung/lara_log_collector/buffer"
 	"github.com/sithuaung/lara_log_collector/config"
@@ -127,6 +129,16 @@ func (s *LarkSender) sendWithRetry(entries []*models.LogEntry) {
 }
 
 func (s *LarkSender) sendWithRetryForApp(entries []*models.LogEntry, appName string) error {
+	var errs []error
+	for _, card := range s.buildCards(entries, appName) {
+		if err := s.sendCardWithRetry(card, appName); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (s *LarkSender) sendCardWithRetry(card map[string]any, appName string) error {
 	var lastErr error
 	delay := s.cfg.RetryDelay
 
@@ -136,7 +148,7 @@ func (s *LarkSender) sendWithRetryForApp(entries []*models.LogEntry, appName str
 			delay *= 2 // Exponential backoff
 		}
 
-		if err := s.send(entries, appName); err != nil {
+		if err := s.sendCard(card); err != nil {
 			lastErr = err
 			log.Printf("Lark send attempt %d failed (app=%q): %v", attempt+1, appName, err)
 			continue
@@ -145,12 +157,6 @@ func (s *LarkSender) sendWithRetryForApp(entries []*models.LogEntry, appName str
 	}
 
 	return lastErr
-}
-
-// send sends a batch of entries to Lark
-func (s *LarkSender) send(entries []*models.LogEntry, appName string) error {
-	card := s.buildCard(entries, appName)
-	return s.sendCard(card)
 }
 
 func (s *LarkSender) sendCard(card map[string]any) error {
@@ -237,54 +243,65 @@ func (s *LarkSender) buildPayload(card map[string]any) map[string]any {
 	return payload
 }
 
-// buildCard creates a Lark card message from log entries
-func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[string]any {
-	// Determine header color based on highest severity
-	headerColor := "blue"
-	for _, entry := range entries {
-		if entry.Level == models.LevelEmergency || entry.Level == models.LevelAlert || entry.Level == models.LevelCritical || entry.Level == models.LevelError {
-			headerColor = "red"
-			break
-		} else if entry.Level == models.LevelWarning && headerColor != "red" {
-			headerColor = "yellow"
-		}
-	}
+const (
+	maxMessageBytes = 4000
+	// Lark rejects webhook request bodies over 20KB.
+	maxCardBytes = 18 * 1024
+)
 
-	grouped := groupEntries(entries)
-	elements := make([]map[string]any, 0, len(grouped)*2)
+// buildCard creates a single Lark card message from log entries
+func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[string]any {
+	return s.buildCards(entries, appName)[0]
+}
+
+// buildCards groups entries and splits them across as many cards as needed to stay under Lark's size limit.
+func (s *LarkSender) buildCards(entries []*models.LogEntry, appName string) []map[string]any {
+	var cards []map[string]any
+	var chunk []groupedEntry
+	var elements []map[string]any
+	size := 0
+	for _, g := range groupEntries(entries) {
+		g.Message = truncateMessage(g.Message, maxMessageBytes)
+		els := s.groupElements(g)
+		n := jsonSize(els)
+		if len(chunk) > 0 && size+n > maxCardBytes {
+			cards = append(cards, buildCardFromElements(chunk, elements, appName))
+			chunk, elements, size = nil, nil, 0
+		}
+		if len(chunk) > 0 {
+			elements = append(elements, map[string]any{"tag": "hr"})
+		}
+		chunk = append(chunk, g)
+		elements = append(elements, els...)
+		size += n
+	}
+	return append(cards, buildCardFromElements(chunk, elements, appName))
+}
+
+func (s *LarkSender) groupElements(g groupedEntry) []map[string]any {
+	header := fmt.Sprintf("**[%s]** %s | %s (x%d)", g.Level, g.Environment, g.Timestamp.Format("2006-01-02 15:04:05"), g.Count)
+	if g.Deduped {
+		header += fmt.Sprintf(" — repeats held back by %s dedup", s.cfg.DedupWindow)
+	}
+	return []map[string]any{
+		{"tag": "div", "text": map[string]any{"tag": "lark_md", "content": header}},
+		{"tag": "div", "text": map[string]any{"tag": "plain_text", "content": g.Message}},
+	}
+}
+
+func buildCardFromElements(grouped []groupedEntry, elements []map[string]any, appName string) map[string]any {
+	headerColor := "blue"
 	total := 0
 	for _, g := range grouped {
 		total += g.Count
+		if g.Level.Severity() >= models.LevelError.Severity() {
+			headerColor = "red"
+		} else if g.Level == models.LevelWarning && headerColor != "red" {
+			headerColor = "yellow"
+		}
 	}
-
-	for i, g := range grouped {
-		// Add divider between entries
-		if i > 0 {
-			elements = append(elements, map[string]any{
-				"tag": "hr",
-			})
-		}
-
-		// Log level and timestamp
-		header := fmt.Sprintf("**[%s]** %s | %s (x%d)", g.Level, g.Environment, g.Timestamp.Format("2006-01-02 15:04:05"), g.Count)
-		if g.Deduped {
-			header += fmt.Sprintf(" — repeats held back by %s dedup", s.cfg.DedupWindow)
-		}
-		elements = append(elements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"tag":     "lark_md",
-				"content": header,
-			},
-		})
-
-		elements = append(elements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"tag":     "plain_text",
-				"content": g.Message,
-			},
-		})
+	if elements == nil {
+		elements = []map[string]any{}
 	}
 
 	return map[string]any{
@@ -301,6 +318,22 @@ func (s *LarkSender) buildCard(entries []*models.LogEntry, appName string) map[s
 		},
 		"elements": elements,
 	}
+}
+
+func jsonSize(v any) int {
+	b, _ := json.Marshal(v)
+	return len(b)
+}
+
+func truncateMessage(message string, max int) string {
+	if len(message) <= max {
+		return message
+	}
+	cut := max
+	for cut > 0 && !utf8.RuneStart(message[cut]) {
+		cut--
+	}
+	return fmt.Sprintf("%s… (truncated %d bytes)", message[:cut], len(message)-cut)
 }
 
 func textTag(content, color string) map[string]any {

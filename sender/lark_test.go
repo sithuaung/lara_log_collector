@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -75,6 +76,26 @@ func TestPacingSharedByConcurrentCards(t *testing.T) {
 	for i := 1; i < len(starts); i++ {
 		if gap := starts[i].Sub(starts[i-1]); gap < 28*time.Millisecond {
 			t.Fatalf("requests only %v apart", gap)
+		}
+	}
+}
+
+func TestBuildCardsStaysUnderLarkSizeLimit(t *testing.T) {
+	s := &LarkSender{}
+	var entries []*models.LogEntry
+	for i := 0; i < 20; i++ {
+		entries = append(entries, &models.LogEntry{
+			Level:   models.LevelError,
+			Message: fmt.Sprintf("SQLSTATE[22001] %d %s", i, strings.Repeat(`"x\`, 5000)),
+		})
+	}
+	cards := s.buildCards(entries, "app")
+	if len(cards) < 2 {
+		t.Fatalf("got %d cards, want split", len(cards))
+	}
+	for _, c := range cards {
+		if n := jsonSize(s.buildPayload(c)); n > 20*1024 {
+			t.Fatalf("card is %d bytes", n)
 		}
 	}
 }

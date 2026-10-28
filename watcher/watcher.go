@@ -155,19 +155,20 @@ func (w *Watcher) readNewLines(logFile string) error {
 		}
 	}
 
-	scanner := bufio.NewScanner(f)
-	// Increase buffer size for potentially long lines
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if entry := w.parser.ParseLine(line); entry != nil {
-			w.handleEntry(entry)
+	reader := bufio.NewReaderSize(f, 64*1024)
+	for {
+		line, err := readLine(reader, maxLineBytes)
+		if line != "" {
+			if entry := w.parser.ParseLine(line); entry != nil {
+				w.handleEntry(entry)
+			}
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan: %w", err)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read: %w", err)
+		}
 	}
 
 	// Flush any pending entry before saving state so a restart
@@ -187,6 +188,24 @@ func (w *Watcher) readNewLines(logFile string) error {
 	}
 
 	return nil
+}
+
+// maxLineBytes caps how much of one log line is kept. bufio.Scanner failed on
+// longer lines without advancing the offset, stalling the watcher forever.
+const maxLineBytes = 1024 * 1024
+
+// readLine returns the next line, keeping at most max bytes and discarding the rest.
+func readLine(r *bufio.Reader, max int) (string, error) {
+	var b []byte
+	for {
+		chunk, isPrefix, err := r.ReadLine()
+		if room := max - len(b); room > 0 {
+			b = append(b, chunk[:min(len(chunk), room)]...)
+		}
+		if err != nil || !isPrefix {
+			return string(b), err
+		}
+	}
 }
 
 // GetCurrentFile returns the current log file being watched
